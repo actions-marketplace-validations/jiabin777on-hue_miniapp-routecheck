@@ -219,8 +219,16 @@ pub fn audit_manifest(content : String, files : Array[String]) -> Json {
   let package_roots = read_subpackages(manifest, declared, issues)
 
   let paths : Map[String, Unit] = Map([])
+  let page_files_by_case : Map[String, Array[String]] = Map([])
   for path in files {
     paths[path] = ()
+    let folded_path = path.to_lower()
+    if folded_path.has_suffix(".js") || folded_path.has_suffix(".wxml") {
+      match page_files_by_case.get(folded_path) {
+        Some(matches) => if !matches.contains(path) { matches.push(path) }
+        None => page_files_by_case[folded_path] = [path]
+      }
+    }
   }
   let routes : Map[String, Route] = Map([])
   let case_paths : Map[String, String] = Map([])
@@ -258,8 +266,20 @@ pub fn audit_manifest(content : String, files : Array[String]) -> Json {
     }
     for extension in [".js", ".wxml"] {
       let file = route.path + extension
-      if !paths.contains(file) {
-        finding(issues, "missing-page-file", route.location, file)
+      if paths.contains(file) {
+        continue
+      }
+      match page_files_by_case.get(file.to_lower()) {
+        Some(matches) => {
+          matches.sort()
+          finding(
+            issues,
+            "page-file-case-mismatch",
+            route.location,
+            "Expected \{file}, found \{matches.join(", ")}.",
+          )
+        }
+        None => finding(issues, "missing-page-file", route.location, file)
       }
     }
   }

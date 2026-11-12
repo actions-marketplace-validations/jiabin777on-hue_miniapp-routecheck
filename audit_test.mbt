@@ -106,11 +106,23 @@ test "main routes cannot be registered from within a subpackage root" {
 ///|
 test "page files must match exact case and optional files are unnecessary" {
   let manifest = "{\"pages\":[\"Home\"]}"
+  let report = @routecheck.audit_manifest(manifest, [
+    "Home.wxml", "home.js", "HOME.JS",
+  ])
   assert_eq(
-    issue_keys(@routecheck.audit_manifest(manifest, ["Home.wxml", "home.js"])),
+    issue_keys(report),
+    [("page-file-case-mismatch", "$.pages[0]")],
+  )
+  assert_true(
+    report.stringify().contains("Expected Home.js, found HOME.JS, home.js."),
+  )
+  assert_eq(
+    issue_keys(@routecheck.audit_manifest(manifest, ["Home.wxml"])),
     [("missing-page-file", "$.pages[0]")],
   )
   assert_true(
-    issue_keys(@routecheck.audit_manifest(manifest, ["Home.wxml", "Home.js"])).is_empty(),
+    issue_keys(
+      @routecheck.audit_manifest(manifest, ["Home.wxml", "Home.js", "home.js"]),
+    ).is_empty(),
   )
 }
