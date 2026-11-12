@@ -56,6 +56,25 @@ test "unsafe paths get only route diagnostics" {
 }
 
 ///|
+test "portable route paths distinguish directories from page basenames" {
+  let manifest =
+    #|{
+    #|  "pages": ["中文/page.v2", "pages/trailing.", "con.txt/home", "pages/LPT²", "pages/no*name", "dotted./home"],
+    #|  "subpackages": [{"root":"pkg.","pages":["detail"]}]
+    #|}
+  let files = [
+    "中文/page.v2.js", "中文/page.v2.wxml", "pages/trailing..js", "pages/trailing..wxml",
+  ]
+  assert_eq(issue_keys(@routecheck.audit_manifest(manifest, files)), [
+    ("invalid-route", "$.pages[2]"),
+    ("invalid-route", "$.pages[3]"),
+    ("invalid-route", "$.pages[4]"),
+    ("invalid-route", "$.pages[5]"),
+    ("invalid-subpackage-root", "$.subpackages[0].root"),
+  ])
+}
+
+///|
 test "case differences and duplicate routes are detected" {
   let manifest =
     #|{"pages":["Home", "home", "Home"]}

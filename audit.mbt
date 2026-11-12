@@ -16,23 +16,51 @@ fn finding(
 }
 
 ///|
-fn is_safe_path(path : String) -> Bool {
+fn is_windows_device_name(segment : String) -> Bool {
+  let stem = match segment.split_once(".") {
+    Some((base, _)) => base.trim().to_owned().to_lower()
+    None => segment.to_lower()
+  }
+  match stem {
+    "con" | "prn" | "aux" | "nul" => true
+    _ if stem.has_prefix("com") || stem.has_prefix("lpt") =>
+      match stem[3:].to_owned() {
+        "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³" =>
+          true
+        _ => false
+      }
+    _ => false
+  }
+}
+
+///|
+fn is_safe_path(path : String, route_stem? : Bool = false) -> Bool {
   for character in path.iter() {
     if character < ' ' ||
       character == '\u007f' ||
       character == '\\' ||
       character == ':' ||
       character == '?' ||
-      character == '#' {
+      character == '#' ||
+      character == '<' ||
+      character == '>' ||
+      character == '"' ||
+      character == '|' ||
+      character == '*' {
       return false
     }
   }
-  for part in path.split("/") {
+  let parts = path.split("/").to_array()
+  for index, part in parts {
     let segment = part.to_owned()
+    // A page basename is followed by .js or .wxml on disk.
+    let full_component = !route_stem || index + 1 < parts.length()
     if segment == "" ||
       segment == "." ||
       segment == ".." ||
-      segment.trim().to_owned() != segment {
+      segment.trim().to_owned() != segment ||
+      (full_component && segment.has_suffix(".")) ||
+      is_windows_device_name(segment) {
       return false
     }
   }
@@ -56,13 +84,13 @@ fn read_pages(
   for index, page in pages {
     let item_location = "\{location}[\{index}]"
     guard page is String(path) &&
-      is_safe_path(path) &&
+      is_safe_path(path, route_stem=true) &&
       !path.has_suffix(".js") &&
       !path.has_suffix(".wxml") &&
       !path.has_suffix(".json") &&
       !path.has_suffix(".wxss") else {
       finding(
-        issues, "invalid-route", item_location, "Expected a relative page path without a file extension.",
+        issues, "invalid-route", item_location, "Expected a portable relative page path without a file extension.",
       )
       continue
     }
@@ -120,7 +148,7 @@ fn read_subpackages(
         issues,
         "invalid-subpackage-root",
         "\{location}.root",
-        "Expected a relative directory path.",
+        "Expected a portable relative directory path.",
       )
       continue
     }
