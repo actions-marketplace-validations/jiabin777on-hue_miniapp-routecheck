@@ -18,6 +18,14 @@ extern "js" fn read_project(source_root : String) -> ProjectFiles =
   #|   }
   #|   const fs = process.getBuiltinModule("node:fs");
   #|   const path = process.getBuiltinModule("node:path");
+  #|   const readUtf8 = (filename) => {
+  #|     const bytes = fs.readFileSync(filename);
+  #|     try {
+  #|       return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  #|     } catch (error) {
+  #|       throw new Error(`${filename} must be UTF-8 encoded.`, { cause: error });
+  #|     }
+  #|   };
   #|   try {
   #|     const project = fs.realpathSync(path.resolve(sourceRoot));
   #|     let root = project;
@@ -30,7 +38,7 @@ extern "js" fn read_project(source_root : String) -> ProjectFiles =
   #|       if (!configEntry.isFile()) {
   #|         throw new Error(`${configPath} must be a regular file.`);
   #|       }
-  #|       const configText = fs.readFileSync(configPath, "utf8");
+  #|       const configText = readUtf8(configPath);
   #|       let config;
   #|       try {
   #|         config = JSON.parse(configText);
@@ -58,7 +66,7 @@ extern "js" fn read_project(source_root : String) -> ProjectFiles =
   #|     if (!fs.lstatSync(manifest).isFile()) {
   #|       return { error: `${manifest} must be a regular file.` };
   #|     }
-  #|     const content = fs.readFileSync(manifest, "utf8");
+  #|     const content = readUtf8(manifest);
   #|     const excludedDirectories = new Set([".git", ".hg", ".svn", "node_modules"]);
   #|     const files = [];
   #|     const directories = [""];
