@@ -83,7 +83,7 @@ fn read_subpackages(
   manifest : Map[String, Json],
   routes : Array[Route],
   issues : Array[Json],
-) -> Unit {
+) -> Array[String] {
   let package_field = match
     (manifest.get("subpackages"), manifest.get("subPackages")) {
     (Some(lower), Some(_)) => {
@@ -96,7 +96,7 @@ fn read_subpackages(
     (None, Some(upper)) => Some(("subPackages", upper))
     (None, None) => None
   }
-  guard package_field is Some((key, value)) else { return }
+  guard package_field is Some((key, value)) else { return [] }
   guard value is Array(packages) else {
     finding(
       issues,
@@ -104,7 +104,7 @@ fn read_subpackages(
       "$.\{key}",
       "Expected an array of subpackages.",
     )
-    return
+    return []
   }
   let roots : Array[String] = []
   for index, entry in packages {
@@ -145,6 +145,17 @@ fn read_subpackages(
       issues,
     )
   }
+  roots
+}
+
+///|
+fn enclosing_subpackage(path : String, roots : Array[String]) -> String? {
+  for root in roots {
+    if path.has_prefix(root + "/") {
+      return Some(root)
+    }
+  }
+  None
 }
 
 ///|
@@ -205,7 +216,7 @@ pub fn audit_manifest(content : String, files : Array[String]) -> Json {
 
   let declared : Array[Route] = []
   read_pages(manifest.get("pages"), "$.pages", None, declared, issues)
-  read_subpackages(manifest, declared, issues)
+  let package_roots = read_subpackages(manifest, declared, issues)
 
   let paths : Map[String, Unit] = Map([])
   for path in files {
@@ -214,6 +225,16 @@ pub fn audit_manifest(content : String, files : Array[String]) -> Json {
   let routes : Map[String, Route] = Map([])
   let case_paths : Map[String, String] = Map([])
   for route in declared {
+    if route.main_package &&
+      enclosing_subpackage(route.path, package_roots) is Some(root) {
+      finding(
+        issues,
+        "main-route-inside-subpackage",
+        route.location,
+        "\{route.path} is inside subpackage root \{root}.",
+      )
+      continue
+    }
     if routes.get(route.path) is Some(previous) {
       finding(
         issues,

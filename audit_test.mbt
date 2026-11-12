@@ -86,6 +86,24 @@ test "nested subpackage root and invalid references are distinct" {
 }
 
 ///|
+test "main routes cannot be registered from within a subpackage root" {
+  let manifest =
+    #|{
+    #|  "pages": ["pkg-other/home", "pkg/old"],
+    #|  "subPackages": [{"root":"pkg","pages":["detail"]}],
+    #|  "tabBar": {"list":[{"pagePath":"pkg-other/home"},{"pagePath":"pkg/old"}]}
+    #|}
+  let files = [
+    "pkg-other/home.js", "pkg-other/home.wxml", "pkg/old.js", "pkg/old.wxml",
+    "pkg/detail.js", "pkg/detail.wxml",
+  ]
+  assert_eq(issue_keys(@routecheck.audit_manifest(manifest, files)), [
+    ("main-route-inside-subpackage", "$.pages[1]"),
+    ("tab-route-not-in-main-package", "$.tabBar.list[1].pagePath"),
+  ])
+}
+
+///|
 test "page files must match exact case and optional files are unnecessary" {
   let manifest = "{\"pages\":[\"Home\"]}"
   assert_eq(
