@@ -1,0 +1,99 @@
+///|
+#external
+type ProjectFiles
+
+///|
+extern "js" fn argument_count() -> Int32 =
+  #| () => process.argv.length - 2
+
+///|
+extern "js" fn source_argument() -> String =
+  #| () => process.argv[2]
+
+///|
+extern "js" fn read_project(source_root : String) -> ProjectFiles =
+  #| (sourceRoot) => {
+  #|   if (typeof process.getBuiltinModule !== "function") {
+  #|     return { error: "Node.js 22.3 or newer is required." };
+  #|   }
+  #|   const fs = process.getBuiltinModule("node:fs");
+  #|   const path = process.getBuiltinModule("node:path");
+  #|   try {
+  #|     const root = path.resolve(sourceRoot);
+  #|     const manifest = path.join(root, "app.json");
+  #|     if (!fs.lstatSync(manifest).isFile()) {
+  #|       return { error: `${manifest} must be a regular file.` };
+  #|     }
+  #|     const content = fs.readFileSync(manifest, "utf8");
+  #|     const excludedDirectories = new Set([".git", ".hg", ".svn", "node_modules"]);
+  #|     const files = [];
+  #|     const directories = [""];
+  #|     while (directories.length !== 0) {
+  #|       const directory = directories.pop();
+  #|       for (const entry of fs.readdirSync(path.join(root, directory), { withFileTypes: true })) {
+  #|         const relative = directory === "" ? entry.name : `${directory}/${entry.name}`;
+  #|         if (entry.isDirectory() && !excludedDirectories.has(entry.name)) {
+  #|           directories.push(relative);
+  #|         } else if (entry.isFile()) {
+  #|           files.push(relative);
+  #|         }
+  #|       }
+  #|     }
+  #|     return { error: "", content, files };
+  #|   } catch (error) {
+  #|     return { error: error.message };
+  #|   }
+  #| }
+
+///|
+extern "js" fn project_error(project : ProjectFiles) -> String =
+  #| (project) => project.error
+
+///|
+extern "js" fn manifest_contents(project : ProjectFiles) -> String =
+  #| (project) => project.content
+
+///|
+extern "js" fn file_count(project : ProjectFiles) -> Int32 =
+  #| (project) => project.files.length
+
+///|
+extern "js" fn file_at(project : ProjectFiles, index : Int32) -> String =
+  #| (project, index) => project.files[index]
+
+///|
+extern "js" fn print_error(message : String) -> Unit =
+  #| (message) => console.error(message)
+
+///|
+extern "js" fn set_exit_code(code : Int32) -> Unit =
+  #| (code) => { process.exitCode = code; }
+
+///|
+fn fail_cli(message : String) -> Unit {
+  print_error(message)
+  set_exit_code(2)
+}
+
+///|
+fn main {
+  guard argument_count() == 1 && source_argument() != "" else {
+    fail_cli("Usage: moon run cmd --target js -- <source-root>")
+    return
+  }
+  let project = read_project(source_argument())
+  let error = project_error(project)
+  guard error == "" else {
+    fail_cli(error)
+    return
+  }
+  let files = Array::makei(file_count(project), fn(index) {
+    file_at(project, index)
+  })
+  let diagnostics = @audit.audit_manifest(manifest_contents(project), files)
+  println(diagnostics.stringify())
+  match diagnostics {
+    Array(items) if items.length() > 0 => set_exit_code(1)
+    _ => ()
+  }
+}

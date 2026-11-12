@@ -1,0 +1,7 @@
+import {
+  "miniapp/routecheck" @audit,
+}
+
+supported_targets = "js"
+
+pkgtype(kind: "executable")

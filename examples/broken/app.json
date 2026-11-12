@@ -1,0 +1,18 @@
+{
+  "pages": ["pages/home/index", "pages/missing/index", "../outside/index"],
+  "subpackages": [
+    {
+      "root": "packages/detail",
+      "pages": ["pages/view/index"]
+    }
+  ],
+  "tabBar": {
+    "color": "#52525b",
+    "selectedColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "packages/detail/pages/view/index", "text": "详情" }
+    ]
+  }
+}
