@@ -7,8 +7,8 @@ extern "js" fn argument_count() -> Int32 =
   #| () => process.argv.length - 2
 
 ///|
-extern "js" fn source_argument() -> String =
-  #| () => process.argv[2]
+extern "js" fn argument_at(index : Int32) -> String =
+  #| (index) => process.argv[index + 2]
 
 ///|
 extern "js" fn read_project(source_root : String) -> ProjectFiles =
@@ -110,12 +110,41 @@ fn fail_cli(message : String) -> Unit {
 }
 
 ///|
-fn main {
-  guard argument_count() == 1 && source_argument() != "" else {
-    fail_cli("Usage: moon run cmd --target js -- <source-root>")
+fn print_text_diagnostics(diagnostics : Json) -> Unit {
+  guard diagnostics is Array(items) else {
+    println(diagnostics.stringify())
     return
   }
-  let project = read_project(source_argument())
+  if items.is_empty() {
+    println("No issues found.")
+  }
+  for item in items {
+    if item is Object(fields) &&
+      fields.get("code") is Some(String(code)) &&
+      fields.get("location") is Some(String(location)) &&
+      fields.get("detail") is Some(String(detail)) {
+      println("[\{code}] \{location}: \{detail}")
+    } else {
+      println(item.stringify())
+    }
+  }
+}
+
+///|
+fn main {
+  let args = Array::makei(argument_count(), argument_at)
+  let (source_root, format) = match parse_cli_arguments(args) {
+    Ok(Help) => {
+      println(usage_message())
+      return
+    }
+    Ok(Audit(root, format)) => (root, format)
+    Err(error) => {
+      fail_cli(error + "\n" + usage_message())
+      return
+    }
+  }
+  let project = read_project(source_root)
   let error = project_error(project)
   guard error == "" else {
     fail_cli(error)
@@ -125,7 +154,10 @@ fn main {
     file_at(project, index)
   })
   let diagnostics = @audit.audit_manifest(manifest_contents(project), files)
-  println(diagnostics.stringify())
+  match format {
+    JsonOutput => println(diagnostics.stringify())
+    TextOutput => print_text_diagnostics(diagnostics)
+  }
   match diagnostics {
     Array(items) if items.length() > 0 => set_exit_code(1)
     _ => ()

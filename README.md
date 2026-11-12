@@ -8,7 +8,11 @@ Miniapp Routecheck 是一个用 MoonBit 编写的命令行工具。它在本地�
 
 ```sh
 moon run cmd --target js -- "<小程序目录>"
+moon run cmd --target js -- --format text "<小程序目录>"
+moon run cmd --target js -- --help
 ```
+
+默认输出 JSON，适合脚本和 CI。`--format text` 会逐行显示诊断代码、配置位置和详情，便于在终端查看。两种格式使用相同的退出码。
 
 检查面向原生小程序目录中的 `.js` 和 `.wxml` 文件。使用 TypeScript 或框架生成小程序文件的项目，请传入构建后的目录。运行检查只需读取项目文件，无需 AppID、上传密钥或微信开发者工具。
 
