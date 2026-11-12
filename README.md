@@ -4,7 +4,7 @@ Miniapp Routecheck 是一个用 MoonBit 编写的命令行工具。它在本地�
 
 ## 运行
 
-需要 [MoonBit 工具链](https://www.moonbitlang.com/download/)（本项目用 2026 年 11 月 4 日发布的 `moon` 验证）和 Node.js 22.3 或更新版本。从本项目目录运行，传入包含 `app.json` 的小程序目录。如果项目使用 `miniprogramRoot`，传入它指向的目录。
+需要 [MoonBit 工具链](https://www.moonbitlang.com/download/)（本项目用 2026 年 11 月 4 日发布的 `moon` 验证）和 Node.js 22.3 或更新版本。从本项目目录运行，传入包含 `app.json` 的小程序目录。也可以传入包含 `project.config.json` 的项目目录，工具会按 `miniprogramRoot` 查找项目内的源码。传入目录中已有 `app.json` 时，优先检查这份配置。
 
 ```sh
 moon run cmd --target js -- "<小程序目录>"

@@ -19,7 +19,41 @@ extern "js" fn read_project(source_root : String) -> ProjectFiles =
   #|   const fs = process.getBuiltinModule("node:fs");
   #|   const path = process.getBuiltinModule("node:path");
   #|   try {
-  #|     const root = path.resolve(sourceRoot);
+  #|     const project = fs.realpathSync(path.resolve(sourceRoot));
+  #|     let root = project;
+  #|     if (!fs.lstatSync(path.join(project, "app.json"), { throwIfNoEntry: false })) {
+  #|       const configPath = path.join(project, "project.config.json");
+  #|       const configEntry = fs.lstatSync(configPath, { throwIfNoEntry: false });
+  #|       if (!configEntry) {
+  #|         throw new Error(`No app.json or project.config.json found in ${project}.`);
+  #|       }
+  #|       if (!configEntry.isFile()) {
+  #|         throw new Error(`${configPath} must be a regular file.`);
+  #|       }
+  #|       const configText = fs.readFileSync(configPath, "utf8");
+  #|       let config;
+  #|       try {
+  #|         config = JSON.parse(configText);
+  #|       } catch (error) {
+  #|         throw new Error(`Invalid JSON in ${configPath}: ${error.message}`);
+  #|       }
+  #|       const configuredRoot = config?.miniprogramRoot;
+  #|       if (typeof configuredRoot !== "string" || configuredRoot.trim() === "" ||
+  #|           path.win32.parse(configuredRoot).root !== "") {
+  #|         throw new Error(`${configPath}: miniprogramRoot must be a non-empty relative directory.`);
+  #|       }
+  #|       const configuredPath = path.resolve(project, configuredRoot.replaceAll("\\", "/"));
+  #|       const relativeRoot = path.relative(project, configuredPath);
+  #|       if (relativeRoot === ".." || relativeRoot.startsWith(".." + path.sep) || path.isAbsolute(relativeRoot)) {
+  #|         throw new Error(`${configPath}: miniprogramRoot must stay within the project directory.`);
+  #|       }
+  #|       for (const segment of relativeRoot ? relativeRoot.split(path.sep) : []) {
+  #|         root = path.join(root, segment);
+  #|         if (!fs.lstatSync(root).isDirectory()) {
+  #|           throw new Error(`miniprogramRoot must use real directories: ${root}.`);
+  #|         }
+  #|       }
+  #|     }
   #|     const manifest = path.join(root, "app.json");
   #|     if (!fs.lstatSync(manifest).isFile()) {
   #|       return { error: `${manifest} must be a regular file.` };
