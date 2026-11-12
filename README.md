@@ -30,10 +30,11 @@ moon run cmd --target js -- --help
 
 ```sh
 moon test --target js
+node --test test/cli.test.cjs
 moon run cmd --target js -- examples/good
 moon run cmd --target js -- examples/broken
 ```
 
-`examples/good` 预期通过。`examples/broken` 预期报告越界路径、缺失的页面脚本和指向分包的底部导航配置。
+`examples/good` 预期通过。`examples/broken` 预期报告越界路径、缺失的页面脚本和指向分包的底部导航配置。端到端测试会运行 `moon run`，检查命令行参数、嵌套源码目录、UTF-8 编码、诊断输出和退出码。
 
 路由规则参照[微信小程序全局配置](https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html)和[使用分包](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/basic.html)。项目使用 Codex 辅助设计、实现与测试，公开提交前由参赛者审核。
