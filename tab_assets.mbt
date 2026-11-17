@@ -8,7 +8,9 @@ fn check_tab_icon(
 ) -> Unit {
   guard icon is Some(value) else { return }
   guard value is String(reference) else {
-    finding(issues, "invalid-tab-icon-path", location, "Expected a local icon path string.")
+    finding(
+      issues, "invalid-tab-icon-path", location, "Expected a local icon path string.",
+    )
     return
   }
   if dark_mode &&
@@ -24,10 +26,7 @@ fn check_tab_icon(
   }
   if !is_safe_path(path) {
     finding(
-      issues,
-      "invalid-tab-icon-path",
-      location,
-      "Expected a local icon path inside the mini program directory.",
+      issues, "invalid-tab-icon-path", location, "Expected a local icon path inside the mini program directory.",
     )
   } else if !paths.contains(path) {
     finding(issues, "missing-tab-icon-file", location, path)

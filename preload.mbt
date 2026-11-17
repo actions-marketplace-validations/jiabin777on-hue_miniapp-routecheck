@@ -59,10 +59,7 @@ fn check_preload_rule(
         )
       _ =>
         finding(
-          issues,
-          "invalid-preload-package",
-          target_location,
-          "Expected a package name or root string.",
+          issues, "invalid-preload-package", target_location, "Expected a package name or root string.",
         )
     }
   }
@@ -77,10 +74,7 @@ fn check_preload_rules(
   guard manifest.get("preloadRule") is Some(value) else { return }
   guard value is Object(rules) else {
     finding(
-      issues,
-      "invalid-preload-rules",
-      "$.preloadRule",
-      "Expected an object keyed by page path.",
+      issues, "invalid-preload-rules", "$.preloadRule", "Expected an object keyed by page path.",
     )
     return
   }
@@ -90,18 +84,12 @@ fn check_preload_rules(
     let location = "$.preloadRule[\{key}]"
     if !routes.contains(page) {
       finding(
-        issues,
-        "unknown-preload-route",
-        location,
-        "Expected a declared page path.",
+        issues, "unknown-preload-route", location, "Expected a declared page path.",
       )
     }
     guard rule is Object(fields) else {
       finding(
-        issues,
-        "invalid-preload-rule",
-        location,
-        "Expected a preload rule object.",
+        issues, "invalid-preload-rule", location, "Expected a preload rule object.",
       )
       continue
     }

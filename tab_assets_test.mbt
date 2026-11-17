@@ -9,10 +9,11 @@ test "tab icons resolve local paths with optional root or dot prefixes" {
     #|  ]}
     #|}
   let files = [
-    "home.js", "home.wxml", "about.js", "about.wxml", "assets/home.png",
-    "assets/active.png",
+    "home.js", "home.wxml", "about.js", "about.wxml", "assets/home.png", "assets/active.png",
   ]
-  assert_true(issue_keys(@routecheck.audit_manifest(manifest, files)).is_empty())
+  assert_true(
+    issue_keys(@routecheck.audit_manifest(manifest, files)).is_empty(),
+  )
 }
 
 ///|
@@ -25,7 +26,9 @@ test "tab icon diagnostics distinguish invalid paths from missing files" {
     #|    {"pagePath":"about","iconPath":"assets/About.png","selectedIconPath":false}
     #|  ]}
     #|}
-  let files = ["home.js", "home.wxml", "about.js", "about.wxml", "assets/about.png"]
+  let files = [
+    "home.js", "home.wxml", "about.js", "about.wxml", "assets/about.png",
+  ]
   assert_eq(issue_keys(@routecheck.audit_manifest(manifest, files)), [
     ("invalid-tab-icon-path", "$.tabBar.list[0].iconPath"),
     ("invalid-tab-icon-path", "$.tabBar.list[0].selectedIconPath"),

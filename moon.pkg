@@ -1,3 +1,7 @@
 import {
   "moonbitlang/core/json",
+  "miniapp/routecheck/scan",
+  "miniapp/routecheck/jsscan",
+  "miniapp/routecheck/wxml",
+  "miniapp/routecheck/wxss",
 }

@@ -25,8 +25,18 @@ fn is_windows_device_name(segment : String) -> Bool {
     "con" | "prn" | "aux" | "nul" => true
     _ if stem.has_prefix("com") || stem.has_prefix("lpt") =>
       match stem[3:].to_owned() {
-        "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³" =>
-          true
+        "1"
+        | "2"
+        | "3"
+        | "4"
+        | "5"
+        | "6"
+        | "7"
+        | "8"
+        | "9"
+        | "¹"
+        | "²"
+        | "³" => true
         _ => false
       }
     _ => false
@@ -34,7 +44,7 @@ fn is_windows_device_name(segment : String) -> Bool {
 }
 
 ///|
-fn is_safe_path(path : String, route_stem? : Bool = false) -> Bool {
+fn is_safe_path(path : String, route_stem~ : Bool = false) -> Bool {
   for character in path.iter() {
     if character < ' ' ||
       character == '\u007f' ||

@@ -10,7 +10,9 @@ test "preload triggers and targets resolve main, subpackage root and alias" {
     #|  }
     #|}
   let files = ["home.js", "home.wxml", "pkg/view.js", "pkg/view.wxml"]
-  assert_true(issue_keys(@routecheck.audit_manifest(manifest, files)).is_empty())
+  assert_true(
+    issue_keys(@routecheck.audit_manifest(manifest, files)).is_empty(),
+  )
 }
 
 ///|
@@ -27,8 +29,12 @@ test "preload diagnostics locate bad triggers, network and individual targets" {
     [
       ("unknown-preload-route", "$.preloadRule[\"missing\\\"page\"]"),
       ("invalid-preload-network", "$.preloadRule[\"missing\\\"page\"].network"),
-      ("unknown-preload-package", "$.preloadRule[\"missing\\\"page\"].packages[0]"),
-      ("invalid-preload-package", "$.preloadRule[\"missing\\\"page\"].packages[1]"),
+      (
+        "unknown-preload-package", "$.preloadRule[\"missing\\\"page\"].packages[0]",
+      ),
+      (
+        "invalid-preload-package", "$.preloadRule[\"missing\\\"page\"].packages[1]",
+      ),
     ],
   )
 }
@@ -36,9 +42,12 @@ test "preload diagnostics locate bad triggers, network and individual targets" {
 ///|
 test "preload rules reject wrong container and missing packages" {
   let files = ["home.js", "home.wxml"]
-  let bad_map = #|{"pages":["home"],"preloadRule":[]}
-  let bad_rule = #|{"pages":["home"],"preloadRule":{"home":false}}
-  let no_packages = #|{"pages":["home"],"preloadRule":{"home":{"network":"all"}}}
+  let bad_map =
+    #|{"pages":["home"],"preloadRule":[]}
+  let bad_rule =
+    #|{"pages":["home"],"preloadRule":{"home":false}}
+  let no_packages =
+    #|{"pages":["home"],"preloadRule":{"home":{"network":"all"}}}
   assert_eq(issue_keys(@routecheck.audit_manifest(bad_map, files)), [
     ("invalid-preload-rules", "$.preloadRule"),
   ])
