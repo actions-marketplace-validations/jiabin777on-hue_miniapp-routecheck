@@ -3,6 +3,10 @@
 type ProjectFiles
 
 ///|
+#external
+type TextFile
+
+///|
 extern "js" fn argument_count() -> Int32 =
   #| () => process.argv.length - 2
 
@@ -11,7 +15,9 @@ extern "js" fn argument_at(index : Int32) -> String =
   #| (index) => process.argv[index + 2]
 
 ///|
-extern "js" fn read_project(source_root : String) -> ProjectFiles =
+/// Locates the mini program source root and lists its files with sizes.
+/// File contents are read later, on demand, by `read_text`.
+extern "js" fn list_project(source_root : String) -> ProjectFiles =
   #| (sourceRoot) => {
   #|   if (typeof process.getBuiltinModule !== "function") {
   #|     return { error: "Node.js 22.3 or newer is required." };
@@ -41,7 +47,7 @@ extern "js" fn read_project(source_root : String) -> ProjectFiles =
   #|       const configText = readUtf8(configPath);
   #|       let config;
   #|       try {
-  #|         config = JSON.parse(configText);
+  #|         config = JSON.parse(configText.replace(/^﻿/, ""));
   #|       } catch (error) {
   #|         throw new Error(`Invalid JSON in ${configPath}: ${error.message}`);
   #|       }
@@ -63,25 +69,31 @@ extern "js" fn read_project(source_root : String) -> ProjectFiles =
   #|       }
   #|     }
   #|     const manifest = path.join(root, "app.json");
-  #|     if (!fs.lstatSync(manifest).isFile()) {
+  #|     const manifestEntry = fs.lstatSync(manifest, { throwIfNoEntry: false });
+  #|     if (manifestEntry && !manifestEntry.isFile()) {
   #|       return { error: `${manifest} must be a regular file.` };
   #|     }
-  #|     const content = readUtf8(manifest);
+  #|     if (manifestEntry) {
+  #|       readUtf8(manifest);
+  #|     }
   #|     const excludedDirectories = new Set([".git", ".hg", ".svn", "node_modules"]);
   #|     const files = [];
   #|     const directories = [""];
   #|     while (directories.length !== 0) {
   #|       const directory = directories.pop();
-  #|       for (const entry of fs.readdirSync(path.join(root, directory), { withFileTypes: true })) {
+  #|       const entries = fs.readdirSync(path.join(root, directory), { withFileTypes: true });
+  #|       entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  #|       for (const entry of entries) {
   #|         const relative = directory === "" ? entry.name : `${directory}/${entry.name}`;
   #|         if (entry.isDirectory() && !excludedDirectories.has(entry.name)) {
   #|           directories.push(relative);
   #|         } else if (entry.isFile()) {
-  #|           files.push(relative);
+  #|           files.push([relative, fs.statSync(path.join(root, relative)).size]);
   #|         }
   #|       }
   #|     }
-  #|     return { error: "", content, files };
+  #|     files.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  #|     return { error: "", root, files };
   #|   } catch (error) {
   #|     return { error: error.message };
   #|   }
@@ -92,16 +104,45 @@ extern "js" fn project_error(project : ProjectFiles) -> String =
   #| (project) => project.error
 
 ///|
-extern "js" fn manifest_contents(project : ProjectFiles) -> String =
-  #| (project) => project.content
+extern "js" fn project_root(project : ProjectFiles) -> String =
+  #| (project) => project.root
 
 ///|
 extern "js" fn file_count(project : ProjectFiles) -> Int32 =
   #| (project) => project.files.length
 
 ///|
-extern "js" fn file_at(project : ProjectFiles, index : Int32) -> String =
-  #| (project, index) => project.files[index]
+extern "js" fn file_path_at(project : ProjectFiles, index : Int32) -> String =
+  #| (project, index) => project.files[index][0]
+
+///|
+extern "js" fn file_size_at(project : ProjectFiles, index : Int32) -> Int32 =
+  #| (project, index) => Math.min(project.files[index][1], 2147483647)
+
+///|
+extern "js" fn read_text(root : String, relative : String) -> TextFile =
+  #| (root, relative) => {
+  #|   const fs = process.getBuiltinModule("node:fs");
+  #|   const path = process.getBuiltinModule("node:path");
+  #|   try {
+  #|     const bytes = fs.readFileSync(path.join(root, ...relative.split("/")));
+  #|     return { ok: true, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
+  #|   } catch (error) {
+  #|     return { ok: false, text: "" };
+  #|   }
+  #| }
+
+///|
+extern "js" fn text_ok(file : TextFile) -> Bool =
+  #| (file) => file.ok
+
+///|
+extern "js" fn text_value(file : TextFile) -> String =
+  #| (file) => file.text
+
+///|
+extern "js" fn write_stdout(text : String) -> Unit =
+  #| (text) => { process.stdout.write(text); }
 
 ///|
 extern "js" fn print_error(message : String) -> Unit =
@@ -118,56 +159,47 @@ fn fail_cli(message : String) -> Unit {
 }
 
 ///|
-fn print_text_diagnostics(diagnostics : Json) -> Unit {
-  guard diagnostics is Array(items) else {
-    println(diagnostics.stringify())
-    return
-  }
-  if items.is_empty() {
-    println("No issues found.")
-  }
-  for item in items {
-    if item is Object(fields) &&
-      fields.get("code") is Some(String(code)) &&
-      fields.get("location") is Some(String(location)) &&
-      fields.get("detail") is Some(String(detail)) {
-      println("[\{code}] \{location}: \{detail}")
-    } else {
-      println(item.stringify())
-    }
-  }
-}
-
-///|
 fn main {
   let args = Array::makei(argument_count(), argument_at)
-  let (source_root, format) = match parse_cli_arguments(args) {
+  let arguments = match parse_cli_arguments(args) {
     Ok(Help) => {
       println(usage_message())
       return
     }
-    Ok(Audit(root, format)) => (root, format)
+    Ok(Audit(arguments)) => arguments
     Err(error) => {
       fail_cli(error + "\n" + usage_message())
       return
     }
   }
-  let project = read_project(source_root)
-  let error = project_error(project)
+  let listing = list_project(arguments.root)
+  let error = project_error(listing)
   guard error == "" else {
     fail_cli(error)
     return
   }
-  let files = Array::makei(file_count(project), fn(index) {
-    file_at(project, index)
+  let root = project_root(listing)
+  let files = Array::makei(file_count(listing), fn(index) {
+    (file_path_at(listing, index), file_size_at(listing, index))
   })
-  let diagnostics = @audit.audit_manifest(manifest_contents(project), files)
-  match format {
-    JsonOutput => println(diagnostics.stringify())
-    TextOutput => print_text_diagnostics(diagnostics)
+  let project = @audit.Project::new(files, fn(relative) {
+    let file = read_text(root, relative)
+    if text_ok(file) {
+      Some(text_value(file))
+    } else {
+      None
+    }
+  })
+  let report = @audit.analyze(project, options=arguments.options)
+  match arguments.format {
+    JsonOutput => println(report.to_json().stringify(indent=2))
+    TextOutput => write_stdout(report.to_text(options=arguments.options))
+    SarifOutput => println(report.to_sarif().stringify(indent=2))
+    DotOutput => write_stdout(report.to_dot())
   }
-  match diagnostics {
-    Array(items) if items.length() > 0 => set_exit_code(1)
-    _ => ()
+  let failures = report.count(Error) +
+    (if arguments.strict { report.count(Warning) } else { 0 })
+  if failures > 0 {
+    set_exit_code(1)
   }
 }
