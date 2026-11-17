@@ -1,7 +1,7 @@
 name = "miniapp/routecheck"
 
-version = "0.1.0"
+version = "0.2.0"
 
-description = "A local route and package audit for native WeChat Mini Programs"
+description = "Dependency graph and subpackage boundary analyzer for WeChat Mini Programs, with WXML, JavaScript and WXSS parsers written in MoonBit"
 
 preferred_target = "js"
