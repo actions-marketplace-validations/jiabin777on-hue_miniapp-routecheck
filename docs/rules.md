@@ -1,6 +1,6 @@
 # 规则参考
 
-每条诊断都有固定的 `code`、级别和位置。源码文件中的问题给出 `文件:行:列`，配置文件中的问题给出 JSON 路径（如 `$.usingComponents["thumb"]`）。
+共 59 个诊断代码。每条诊断都有固定的 `code`、级别和位置。源码文件中的问题给出 `文件:行:列`，配置文件中的问题给出 JSON 路径（如 `$.usingComponents["thumb"]`）。
 
 级别含义：
 
@@ -91,19 +91,61 @@
 
 ## app.json 配置
 
+本节的配置问题均为 error，位置以 JSON 路径给出。
+
+文件与 JSON：
+
 | code | 级别 | 触发条件 |
 | --- | --- | --- |
-| `invalid-json` / `invalid-manifest` | error | `app.json` 不是合法 JSON 对象，或存在重复键。 |
-| `invalid-pages` / `invalid-route` | error | 页面列表为空，或路径不可移植（越界、绝对路径、带扩展名、Windows 保留名等）。 |
-| `duplicate-route` / `route-case-collision` | error | 页面重复注册，或仅大小写不同。 |
-| `main-route-inside-subpackage` | error | 主包页面位于分包根目录下。 |
-| `overlapping-subpackage-root` | error | 分包根目录相互嵌套。 |
-| `missing-page-file` / `page-file-case-mismatch` | error | 页面缺少 `.js` / `.wxml`，或文件名大小写不一致。 |
-| `unknown-entry-route` | error | `entryPagePath` 未注册。 |
-| `tab-route-not-in-main-package` / `invalid-tab-count` | error | tabBar 页面不在主包，或数量不在 2–5 之间。 |
-| `missing-tab-icon-file` | error | tabBar 图标文件不存在。 |
-| `unknown-preload-route` / `unknown-preload-package` | error | `preloadRule` 引用了未注册的页面或不存在的分包。 |
+| `missing-app-json` | error | 小程序根目录下没有 `app.json`。 |
 | `unreadable-file` | error | 文件不是 UTF-8 文本。 |
+| `invalid-json` | error | `app.json` 或组件、页面的 JSON 配置不是合法 JSON，或存在重复键。 |
+| `invalid-manifest` | error | `app.json` 的顶层不是 JSON 对象。 |
+
+页面：
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `invalid-pages` | error | `pages` 不是非空的页面路径数组。 |
+| `invalid-route` | error | 页面路径不可移植：越界、绝对路径、带扩展名、Windows 保留名等。 |
+| `duplicate-route` | error | 同一页面重复注册。 |
+| `route-case-collision` | error | 两个页面路径仅大小写不同。 |
+| `main-route-inside-subpackage` | error | 主包页面位于分包根目录下。 |
+| `missing-page-file` | error | 页面缺少 `.js` 或 `.wxml`。 |
+| `page-file-case-mismatch` | error | 页面文件存在，但文件名大小写与注册的路径不一致。 |
+| `unknown-entry-route` | error | `entryPagePath` 未注册，或带有查询参数。 |
+
+分包：
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `duplicate-subpackage-field` | error | 同时写了 `subpackages` 和 `subPackages`，只应使用一种写法。 |
+| `invalid-subpackages` | error | `subpackages` / `subPackages` 不是数组。 |
+| `invalid-subpackage` | error | 分包条目不是对象。 |
+| `invalid-subpackage-root` | error | 分包缺少 `root`，或 `root` 不是可移植的相对目录路径。 |
+| `overlapping-subpackage-root` | error | 分包根目录相同或相互嵌套。 |
+
+tabBar：
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `invalid-tab-bar` | error | 声明了 `tabBar`，但 `tabBar.list` 不是数组。 |
+| `invalid-tab-count` | error | tabBar 项数不在 2–5 之间。 |
+| `tab-route-not-in-main-package` | error | tabBar 页面不是主包页面。 |
+| `invalid-tab-icon-path` | error | 图标路径不是字符串，或越出小程序目录。深色模式下的 `@变量` 引用不报告。 |
+| `missing-tab-icon-file` | error | tabBar 图标文件不存在。 |
+
+分包预下载（`preloadRule`）：
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `invalid-preload-rules` | error | `preloadRule` 不是以页面路径为键的对象。 |
+| `unknown-preload-route` | error | `preloadRule` 的键不是已注册的页面。 |
+| `invalid-preload-rule` | error | 某条预下载规则不是对象。 |
+| `invalid-preload-network` | error | `network` 不是 `wifi` 或 `all`。 |
+| `invalid-preload-packages` | error | `packages` 不是数组。 |
+| `invalid-preload-package` | error | `packages` 中的项不是字符串。 |
+| `unknown-preload-package` | error | `packages` 中的名称既不是任何分包的 `name`，也不是 `root`。 |
 
 ## 已知局限
 
