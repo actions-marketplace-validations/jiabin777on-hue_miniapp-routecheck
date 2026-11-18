@@ -159,9 +159,92 @@ fn find_url_property(tokens : Array[Token], open : Int32) -> (String, Int32)? {
 }
 
 ///|
+/// The local names an import declaration binds, given the tokens between
+/// `import` and `from`: `a`, `* as ns`, `{ b, c as d }`. Specifiers marked
+/// `type` (`{ type T }`) bind no runtime value and are left out.
+fn import_bindings(
+  tokens : Array[Token],
+  start : Int32,
+  end : Int32,
+) -> Array[String] {
+  let names = []
+  let mut index = start
+  let mut in_braces = false
+  while index < end {
+    match tokens[index].kind {
+      Punct("{") => in_braces = true
+      Punct("}") => in_braces = false
+      Ident("type") if in_braces &&
+        token_kind(tokens, index + 1) is Some(Ident(_)) => {
+        // Skip `type T` or `type T as U`.
+        index += 2
+        if is_ident(tokens, index, "as") {
+          index += 2
+        }
+        continue
+      }
+      Ident(name) if name != "as" => {
+        if is_ident(tokens, index + 1, "as") {
+          // `b as c` binds c.
+          index += 2
+          continue
+        }
+        names.push(name)
+      }
+      _ => ()
+    }
+    index += 1
+  }
+  names
+}
+
+///|
+/// Tokens after which an identifier is read as a type, not a value:
+/// annotations (`x: T`), type arguments (`Array<T>`), unions, intersections,
+/// assertions and `implements` clauses.
+fn in_type_position(tokens : Array[Token], index : Int32) -> Bool {
+  match token_kind(tokens, index - 1) {
+    Some(Punct(":")) | Some(Punct("<")) | Some(Punct("|")) | Some(Punct("&")) =>
+      true
+    Some(Ident("as")) | Some(Ident("implements")) | Some(Ident("satisfies")) =>
+      true
+    _ => false
+  }
+}
+
+///|
+/// Whether TypeScript removes the import declaration spanning `start` to
+/// `end`: it binds names, and every use of them outside the declaration is
+/// in a type position. This mirrors how `tsc` elides imports that are only
+/// used as types; it is lexical, so a value used as an object property
+/// value (`{ key: Name }`) is mistaken for a type.
+fn elided_import(tokens : Array[Token], start : Int32, end : Int32) -> Bool {
+  let names = import_bindings(tokens, start, end)
+  if names.is_empty() {
+    // `import {} from 'x'` and `import { type T } from 'x'` bind nothing
+    // at runtime, and tsc removes them too.
+    return true
+  }
+  for index, token in tokens {
+    if index >= start && index < end {
+      continue
+    }
+    if token.kind is Ident(name) &&
+      names.contains(name) &&
+      !is_member(tokens, index) &&
+      !in_type_position(tokens, index) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// Collects the static module references and page navigations in a
-/// JavaScript or WXS source file.
-pub fn analyze(source : String) -> ScriptFacts {
+/// JavaScript or WXS source file. With `typescript`, the source is a
+/// DevTools-compiled `.ts` file: `import type` and imports whose bindings
+/// are only used as types are dropped, as the compiler drops them.
+pub fn analyze(source : String, typescript~ : Bool = false) -> ScriptFacts {
   let (tokens, errors) = tokenize(source)
   let dependencies : Array[Dependency] = []
   let navigations : Array[Navigation] = []
@@ -190,11 +273,18 @@ pub fn analyze(source : String) -> ScriptFacts {
         add(Import, index + 1)
       "import" if !is_punct(tokens, index + 1, ".") => {
         // import a, { b as c } from 'x'
+        if typescript &&
+          is_ident(tokens, index + 1, "type") &&
+          !is_ident(tokens, index + 2, "from") {
+          continue
+        }
         let mut cursor = index + 1
         while cursor < tokens.length() && !is_punct(tokens, cursor, ";") {
           if is_ident(tokens, cursor, "from") &&
             static_string(tokens, cursor + 1) is Some(_) {
-            add(Import, cursor + 1)
+            if !(typescript && elided_import(tokens, index + 1, cursor)) {
+              add(Import, cursor + 1)
+            }
             break
           }
           if is_punct(tokens, cursor, "{") {

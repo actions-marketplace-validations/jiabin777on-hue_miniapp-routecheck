@@ -76,6 +76,28 @@ extern "js" fn list_project(source_root : String) -> ProjectFiles =
   #|     if (manifestEntry) {
   #|       readUtf8(manifest);
   #|     }
+  #|     // Compiler plugins (TypeScript, Less, Sass) come from the project
+  #|     // config next to app.json or in the project directory.
+  #|     const plugins = [];
+  #|     for (const dir of new Set([root, project])) {
+  #|       const configPath = path.join(dir, "project.config.json");
+  #|       const entry = fs.lstatSync(configPath, { throwIfNoEntry: false });
+  #|       if (!entry || !entry.isFile()) continue;
+  #|       let config;
+  #|       try {
+  #|         config = JSON.parse(readUtf8(configPath).replace(/^﻿/, ""));
+  #|       } catch (error) {
+  #|         continue;
+  #|       }
+  #|       const listed = config?.setting?.useCompilerPlugins;
+  #|       if (Array.isArray(listed)) {
+  #|         for (const item of listed) {
+  #|           const name = typeof item === "string" ? item : item?.type;
+  #|           if (typeof name === "string") plugins.push(name);
+  #|         }
+  #|       }
+  #|       break;
+  #|     }
   #|     const excludedDirectories = new Set([".git", ".hg", ".svn", "node_modules"]);
   #|     const files = [];
   #|     const directories = [""];
@@ -93,11 +115,19 @@ extern "js" fn list_project(source_root : String) -> ProjectFiles =
   #|       }
   #|     }
   #|     files.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  #|     return { error: "", root, files };
+  #|     return { error: "", root, files, plugins };
   #|   } catch (error) {
   #|     return { error: error.message };
   #|   }
   #| }
+
+///|
+extern "js" fn plugin_count(project : ProjectFiles) -> Int32 =
+  #| (project) => project.plugins.length
+
+///|
+extern "js" fn plugin_at(project : ProjectFiles, index : Int32) -> String =
+  #| (project, index) => project.plugins[index]
 
 ///|
 extern "js" fn project_error(project : ProjectFiles) -> String =
@@ -190,6 +220,10 @@ fn main {
       None
     }
   })
+  let plugins = Array::makei(plugin_count(listing), fn(index) {
+    plugin_at(listing, index)
+  })
+  let project = project.with_compiler_plugins(plugins)
   let report = @audit.analyze(project, options=arguments.options)
   match arguments.format {
     JsonOutput => println(report.to_json().stringify(indent=2))

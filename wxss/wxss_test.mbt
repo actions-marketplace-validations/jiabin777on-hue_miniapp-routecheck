@@ -41,3 +41,18 @@ test "malformed input reports positions" {
     ("Unterminated comment.", 4),
   ])
 }
+
+///|
+test "Less and Sass line comments are skipped only when asked" {
+  let source =
+    #|// don't @import "old.less";
+    #|@import "vars.less";
+    #|.a { background: url(//cdn.example.com/a.png); } // url(local.png)
+  assert_eq(
+    @wxss.analyze(source, line_comments=true).references.map(fn(r) {
+      (r.kind, r.target)
+    }),
+    [(Import, "vars.less"), (Url, "//cdn.example.com/a.png")],
+  )
+  assert_true(@wxss.analyze(source).errors.length() > 0)
+}

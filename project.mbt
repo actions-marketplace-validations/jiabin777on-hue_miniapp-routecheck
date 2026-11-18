@@ -7,6 +7,11 @@
 pub struct Project {
   sizes : Map[String, Int32]
   reader : (String) -> String?
+  /// Compiled path -> the source file the developer wrote, for files that
+  /// a WeChat DevTools compiler plugin produces (`index.ts` -> `index.js`).
+  sources : Map[String, String]
+  /// The reverse of `sources`: plugin source -> compiled path.
+  outputs : Map[String, String]
 }
 
 ///|
@@ -18,7 +23,7 @@ pub fn Project::new(
   for file in files {
     sizes[file.0] = file.1
   }
-  { sizes, reader, }
+  { sizes, reader, sources: Map([]), outputs: Map([]), }
 }
 
 ///|
@@ -73,4 +78,87 @@ pub(all) struct Options {
 ///|
 pub fn Options::default() -> Options {
   { max_package_bytes: 2 * 1024 * 1024, max_total_bytes: 20 * 1024 * 1024, }
+}
+
+///|
+/// The source extensions each `useCompilerPlugins` entry of
+/// `project.config.json` compiles, and the extension DevTools emits.
+fn compiler_rules(plugins : Array[String]) -> Array[(String, String)] {
+  let rules = []
+  for plugin in plugins {
+    match plugin {
+      "typescript" => rules.push((".ts", ".js"))
+      "less" => rules.push((".less", ".wxss"))
+      "sass" => {
+        rules.push((".scss", ".wxss"))
+        rules.push((".sass", ".wxss"))
+      }
+      _ => ()
+    }
+  }
+  rules
+}
+
+///|
+fn compiled_path(path : String, rules : Array[(String, String)]) -> String? {
+  if path.has_suffix(".d.ts") {
+    return None
+  }
+  for rule in rules {
+    if path.strip_suffix(rule.0) is Some(stem) {
+      return Some(stem.to_owned() + rule.1)
+    }
+  }
+  None
+}
+
+///|
+/// The project as DevTools compiles it with the given compiler plugins
+/// (`typescript`, `less`, `sass`): each `a.ts` is analyzed as `a.js` and
+/// each `a.less` / `a.scss` / `a.sass` as `a.wxss`, unless the compiled
+/// file is already present. Findings name the source file again.
+pub fn Project::with_compiler_plugins(
+  self : Project,
+  plugins : Array[String],
+) -> Project {
+  let rules = compiler_rules(plugins)
+  if rules.is_empty() {
+    return self
+  }
+  let sizes : Map[String, Int32] = Map([])
+  let sources : Map[String, String] = Map([])
+  for path, size in self.sizes {
+    match compiled_path(path, rules) {
+      Some(output) if !self.sizes.contains(output) && !sources.contains(output) => {
+        sizes[output] = size
+        sources[output] = path
+      }
+      _ => sizes[path] = size
+    }
+  }
+  let outputs : Map[String, String] = Map([])
+  for output, source in sources {
+    outputs[source] = output
+  }
+  let reader = self.reader
+  {
+    sizes,
+    reader: fn(path) { reader(sources.get(path).unwrap_or(path)) },
+    sources,
+    outputs,
+  }
+}
+
+///|
+/// The file the developer wrote for `path`: the plugin source of a
+/// compiled file, otherwise `path` itself.
+pub fn Project::source_name(self : Project, path : String) -> String {
+  self.sources.get(path).unwrap_or(path)
+}
+
+///|
+/// Maps a reference that names a plugin source (`./util.ts`,
+/// `vars.less`) to the compiled file it becomes.
+fn Project::compiled_name(self : Project, path : String) -> String {
+  self.outputs.get(path).unwrap_or(path)
 }

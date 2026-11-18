@@ -430,3 +430,76 @@ test "SARIF and DOT renderings" {
   )
   assert_true(text.contains("1 errors, 0 warnings, 0 notes."))
 }
+
+///|
+test "TypeScript and Less sources are analyzed as their compiled files" {
+  let sources = project([
+    (
+      "app.json", "{\"pages\": [\"pages/home/index\"], \"usingComponents\": {\"card\": \"/components/card/index\"}}",
+    ),
+    (
+      "app.ts", "import { boot } from './utils/boot'\nApp({ onLaunch() { boot() } })",
+    ),
+    ("app.less", "// shared theme\n@import \"./styles/vars.less\";"),
+    ("styles/vars.less", "@brand: red; // don't inline"),
+    (
+      "utils/boot.ts", "import { missing } from './gone'\nexport const boot = () => missing()",
+    ),
+    ("types/global.d.ts", "declare const x: number"),
+    ("components/card/index.json", component_json),
+    ("components/card/index.ts", "Component({})"),
+    ("components/card/index.wxml", "<view />"),
+    ("pages/home/index.json", "{}"),
+    ("pages/home/index.ts", page),
+    ("pages/home/index.wxml", "<card />"),
+  ])
+  let report = @routecheck.analyze(
+    sources.with_compiler_plugins(["typescript", "less"]),
+  )
+  assert_eq(found(report), [("unresolved-module", "utils/boot.ts:1:25")])
+  // Without the plugins the same sources are missing their compiled files.
+  assert_true(
+    found(@routecheck.analyze(sources)).contains(
+      ("missing-page-file", "app.json $.pages[0]"),
+    ),
+  )
+}
+
+///|
+test "extended libraries, inert links and camelCase openType are understood" {
+  let report = @routecheck.analyze(
+    project([
+      (
+        "app.json",
+        (
+          #|{
+          #|  "pages": ["pages/home/index", "pages/me/index"],
+          #|  "tabBar": {"list": [
+          #|    {"pagePath": "pages/home/index"}, {"pagePath": "pages/me/index"}
+          #|  ]},
+          #|  "useExtendedLib": {"weui": "latest"}
+          #|}
+        ),
+      ),
+      ("app.js", "App({})"),
+      (
+        "pages/home/index.json", "{\"usingComponents\": {\"mp-cell\": \"weui-miniprogram/cell/cell\"}}",
+      ),
+      ("pages/home/index.js", page),
+      (
+        "pages/home/index.wxml",
+        (
+          #|<mp-cell />
+          #|<navigator url="">placeholder</navigator>
+          #|<navigator url="#top">anchor</navigator>
+          #|<navigator url="javascript:;">noop</navigator>
+          #|<navigator url="//beian.miit.gov.cn/">record</navigator>
+          #|<navigator url="/pages/me/index" openType="switchTab">me</navigator>
+        ),
+      ),
+      ("pages/me/index.js", page),
+      ("pages/me/index.wxml", "<view />"),
+    ]),
+  )
+  assert_eq(found(report), [])
+}

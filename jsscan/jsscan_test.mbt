@@ -115,3 +115,32 @@ test "unterminated template and bad escapes" {
   let (_, errors) = @jsscan.tokenize("'\\xZZ'")
   assert_eq(errors[0].message, "Invalid hexadecimal escape sequence.")
 }
+
+///|
+fn ts_specifiers(source : String) -> Array[String] {
+  @jsscan.analyze(source, typescript=true).dependencies.map(fn(d) {
+    d.specifier
+  })
+}
+
+///|
+test "TypeScript imports used only as types are dropped like tsc drops them" {
+  let source =
+    #|import type { Options } from './types'
+    #|import XrFrame from 'XrFrame'
+    #|import { type Shape, make } from './shape'
+    #|import { type Only } from './only-types'
+    #|import Base from './base'
+    #|import * as fmt from './format'
+    #|import './side-effect'
+    #|const schema: XrFrame.IComponentSchema = {}
+    #|let list: Array<Shape> = []
+    #|class A extends Base implements XrFrame.Component {}
+    #|const s = make() as Shape
+    #|export const f = (x: Options) => fmt.pad(x)
+  assert_eq(ts_specifiers(source), [
+    "./shape", "./base", "./format", "./side-effect",
+  ])
+  // Plain JavaScript keeps every import.
+  assert_eq(specifiers(source).length(), 7)
+}

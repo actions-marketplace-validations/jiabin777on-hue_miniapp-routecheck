@@ -80,6 +80,7 @@ pub fn analyze(
     wxml: Map([]),
     navigations: [],
     queue: [],
+    extended_prefixes: [],
   }
   analyzer.load_manifest(manifest)
   analyzer.seed(manifest)
@@ -90,10 +91,14 @@ pub fn analyze(
   analyzer.check_navigation()
   analyzer.check_require_cycles()
   let packages = analyzer.check_sizes(options)
+  // Name the files the developer wrote, not their compiled outputs.
+  let source = fn(path) { project.source_name(path) }
   {
-    findings: analyzer.findings,
+    findings: analyzer.findings.map(fn(f) { { ..f, file: source(f.file), } }),
     packages,
-    edges: analyzer.edges,
+    edges: analyzer.edges.map(fn(e) {
+      { ..e, from: source(e.from), to: source(e.to), file: source(e.file), }
+    }),
     files: project.sizes.length(),
   }
 }

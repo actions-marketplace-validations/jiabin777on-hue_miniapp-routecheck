@@ -193,6 +193,14 @@ fn Analyzer::check_boundaries(self : Analyzer) -> Unit {
 ///|
 fn Analyzer::check_navigation(self : Analyzer) -> Unit {
   for site in self.navigations {
+    // An empty url, a fragment, `javascript:` or a web address does not
+    // name a page: WeUI-style markup uses them as inert link targets.
+    if site.url == "" ||
+      site.url.has_prefix("#") ||
+      site.url.has_prefix("javascript:") ||
+      is_external(site.url) {
+      continue
+    }
     let route = if site.url.has_prefix("/") {
       normalize_path(site.url)
     } else {
@@ -345,6 +353,7 @@ fn Analyzer::check_require_cycles(self : Analyzer) -> Unit {
     guard members.length() > 1 || self_loop else { continue }
     members.sort()
     let anchor = first_edge[members[0]]
+    let names = members.map(fn(m) { self.project.source_name(m) })
     self.add({
       code: "require-cycle",
       severity: Warning,
@@ -352,7 +361,7 @@ fn Analyzer::check_require_cycles(self : Analyzer) -> Unit {
       location: "",
       line: anchor.line,
       column: anchor.column,
-      detail: "Modules require each other: \{members.join(" -> ")}. One side sees a partially initialized module.exports.",
+      detail: "Modules require each other: \{names.join(" -> ")}. One side sees a partially initialized module.exports.",
     })
   }
 }

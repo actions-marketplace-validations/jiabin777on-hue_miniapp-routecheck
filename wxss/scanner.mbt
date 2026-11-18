@@ -106,8 +106,9 @@ fn Scanner::read_import(self : Scanner) -> Unit {
 ///|
 /// Collects `@import` targets and `url()` references from WXSS source.
 /// Comments and string contents are skipped so commented-out imports are not
-/// reported.
-pub fn analyze(source : String) -> StyleFacts {
+/// reported. `line_comments` also skips `//` comments, for Less and Sass
+/// sources that DevTools compiles to WXSS.
+pub fn analyze(source : String, line_comments~ : Bool = false) -> StyleFacts {
   let scanner : Scanner = {
     cursor: @scan.Cursor::new(source),
     references: [],
@@ -128,6 +129,10 @@ pub fn analyze(source : String) -> StyleFacts {
         })
       } else {
         cursor.skip(2)
+      }
+    } else if line_comments && cursor.looking_at("//") {
+      while !cursor.at_end() && cursor.peek() != '\n' {
+        ignore(cursor.advance())
       }
     } else if cursor.peek() == '"' || cursor.peek() == '\'' {
       ignore(scanner.read_string())

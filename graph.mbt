@@ -123,6 +123,9 @@ priv struct Analyzer {
   wxml : Map[String, WxmlInfo]
   navigations : Array[NavigationSite]
   queue : Array[Work]
+  /// Component path prefixes served by `useExtendedLib`, which DevTools
+  /// supplies at build time instead of reading from the project.
+  extended_prefixes : Array[String]
 }
 
 ///|
@@ -278,6 +281,13 @@ fn Analyzer::load_manifest(
   for pkg in self.packages {
     for page in pkg.pages {
       self.routes[page] = ()
+    }
+  }
+  if manifest.get("useExtendedLib") is Some(Object(libraries)) {
+    match libraries.get("weui") {
+      Some(True) | Some(String(_)) =>
+        self.extended_prefixes.push("weui-miniprogram/")
+      _ => ()
     }
   }
   if manifest.get("tabBar") is Some(Object(tab_bar)) &&
@@ -505,7 +515,14 @@ fn Analyzer::read_components(
     if !location.has_prefix("$.componentGenerics") {
       info.declared.push({ tag, location, })
     }
-    match resolve_component(self.project, directory, reference) {
+    let resolution = if self.extended_prefixes
+      .iter()
+      .any(fn(prefix) { reference.has_prefix(prefix) }) {
+      External
+    } else {
+      resolve_component(self.project, directory, reference)
+    }
+    match resolution {
       Found(target) => {
         let edge_kind : EdgeKind = if placeholders.contains(tag) {
           AsyncComponent
@@ -591,7 +608,10 @@ fn Analyzer::reference(
 ///|
 fn Analyzer::visit_script(self : Analyzer, path : String, wxs : Bool) -> Unit {
   guard self.read(path) is Some(text) else { return }
-  let facts = @jsscan.analyze(text)
+  let facts = @jsscan.analyze(
+    text,
+    typescript=self.project.source_name(path).has_suffix(".ts"),
+  )
   for error in facts.errors {
     self.add(
       source_finding(
@@ -755,8 +775,12 @@ fn Analyzer::visit_wxml(self : Analyzer, path : String) -> Unit {
       "navigator" =>
         if element.static_value("target") != Some("miniProgram") &&
           element.static_value("url") is Some(url) {
-          let api : @jsscan.NavigationApi? = match
-            element.static_value("open-type").unwrap_or("navigate") {
+          // DevTools accepts the camelCase spelling `openType` too.
+          let open_type = match element.static_value("open-type") {
+            Some(value) => value
+            None => element.static_value("openType").unwrap_or("navigate")
+          }
+          let api : @jsscan.NavigationApi? = match open_type {
             "navigate" => Some(NavigateTo)
             "redirect" => Some(RedirectTo)
             "switchTab" => Some(SwitchTab)
@@ -798,7 +822,11 @@ fn Analyzer::visit_wxml(self : Analyzer, path : String) -> Unit {
 ///|
 fn Analyzer::visit_wxss(self : Analyzer, path : String) -> Unit {
   guard self.read(path) is Some(text) else { return }
-  let facts = @wxss.analyze(text)
+  // Less and Sass sources allow `//` comments; plain WXSS does not.
+  let facts = @wxss.analyze(
+    text,
+    line_comments=self.project.source_name(path) != path,
+  )
   for error in facts.errors {
     self.add(
       source_finding(

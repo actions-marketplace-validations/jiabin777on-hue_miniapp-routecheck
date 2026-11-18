@@ -24,6 +24,7 @@ priv struct Lookup {
 
 ///|
 fn probe(project : Project, base : String, lookup : Lookup) -> String? {
+  let base = project.compiled_name(base)
   if project.exists(base) &&
     (
       lookup.extensions.is_empty() ||

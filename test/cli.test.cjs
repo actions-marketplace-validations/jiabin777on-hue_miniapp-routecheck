@@ -157,6 +157,30 @@ test('a project directory can select a nested mini program with UTF-8 BOM files'
   );
 });
 
+test('compiler plugins in project.config.json let TypeScript pages stand in for JavaScript', (t) => {
+  const root = temporaryProject(t);
+  writeProject(root, {
+    'project.config.json': JSON.stringify({
+      miniprogramRoot: 'miniprogram/',
+      setting: { useCompilerPlugins: ['typescript', { type: 'less' }] },
+    }),
+    'miniprogram/app.json': '{"pages":["pages/a/index"]}',
+    'miniprogram/app.ts': "import type { Config } from './types'\nApp({})",
+    'miniprogram/app.less': "// theme\n@import './vars.less';",
+    'miniprogram/vars.less': '@c: red;',
+    'miniprogram/pages/a/index.ts': "import { go } from '../../utils/missing'\nPage({ go })",
+    'miniprogram/pages/a/index.wxml': '<view />',
+  });
+  const audit = run(root);
+  assert.equal(audit.status, 1, audit.stderr);
+  assert.deepEqual(findings(audit), [['unresolved-module', 'pages/a/index.ts:1:20']]);
+
+  // Without the plugin setting the TypeScript page has no compiled script.
+  writeFileSync(join(root, 'project.config.json'), '{"miniprogramRoot":"miniprogram/"}');
+  const plain = run(root);
+  assert.ok(findings(plain).some(([code]) => code === 'missing-page-file'));
+});
+
 test('a configured source directory cannot escape the project root', (t) => {
   const root = temporaryProject(t);
   const project = join(root, 'project');
