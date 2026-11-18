@@ -108,6 +108,27 @@ test('SARIF output is valid 2.1.0 with one result per finding', () => {
   assert.deepEqual(first.locations[0].physicalLocation.region, { startLine: 1, startColumn: 1 });
 });
 
+test('--sarif-base writes paths relative to the repository root', (t) => {
+  const repo = temporaryProject(t);
+  cpSync(example('shop-broken'), join(repo, 'src', 'mini app'), { recursive: true });
+  writeFileSync(join(repo, 'src', 'project.config.json'), '{"miniprogramRoot":"mini app/"}');
+  const audit = run('--format', 'sarif', '--sarif-base', repo, join(repo, 'src'));
+  assert.equal(audit.status, 1, audit.stderr);
+  const uris = JSON.parse(audit.stdout).runs[0].results.map(
+    (r) => r.locations[0].physicalLocation.artifactLocation.uri,
+  );
+  assert.equal(uris.length, 13);
+  assert.ok(uris.every((uri) => uri.startsWith('src/mini app/')), uris.join('\n'));
+
+  const plain = run('--format', 'sarif', example('shop-broken'));
+  const same = run('--format', 'sarif', '--sarif-base', example('shop-broken'), example('shop-broken'));
+  assert.equal(same.stdout, plain.stdout);
+
+  const outside = run('--format', 'sarif', '--sarif-base', join(repo, 'src', 'mini app', 'pages'), join(repo, 'src'));
+  assert.equal(outside.status, 2);
+  assert.match(outside.stderr, /--sarif-base .* must contain the mini program root/);
+});
+
 test('DOT output clusters packages and marks violating edges', () => {
   const audit = run('--format', 'dot', example('shop-broken'));
   assert.equal(audit.status, 1, audit.stderr);
@@ -225,6 +246,7 @@ test('help succeeds and an unknown option is an invocation error', () => {
   const help = run('--help');
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /--format json\|text\|sarif\|dot/);
+  assert.match(help.stdout, /--sarif-base <dir>/);
 
   const badOption = run('--unknown-option', example('good'));
   assert.equal(badOption.status, 2);

@@ -12,6 +12,9 @@ priv struct AuditArguments {
   format : OutputFormat
   /// Warnings also fail the run.
   strict : Bool
+  /// SARIF paths are written relative to this directory instead of the
+  /// mini program root, so code scanning can map them onto the repository.
+  sarif_base : String?
   options : @audit.Options
 }
 
@@ -33,6 +36,9 @@ fn usage_message() -> String {
     #|                                sarif feeds GitHub code scanning; dot is
     #|                                the package dependency graph for Graphviz.
     #|  --strict                      Treat warnings as failures.
+    #|  --sarif-base <dir>            Write SARIF paths relative to <dir>
+    #|                                (e.g. the repository root) instead of
+    #|                                the mini program root.
     #|  --max-package-kb <n>          Per-package size limit (default: 2048).
     #|  --max-total-kb <n>            Total size limit (default: 20480).
     #|  -h, --help                    Show this help.
@@ -68,6 +74,7 @@ fn parse_cli_arguments(args : Array[String]) -> Result[CliArguments, String] {
   let mut source_root = None
   let mut format = JsonOutput
   let mut strict = false
+  let mut sarif_base = None
   let mut options = @audit.Options::default()
   while index < args.length() {
     let arg = args[index]
@@ -85,7 +92,10 @@ fn parse_cli_arguments(args : Array[String]) -> Result[CliArguments, String] {
         continue
       }
       let mut handled = false
-      for name in ["--format", "--max-package-kb", "--max-total-kb"] {
+      for
+        name in [
+          "--format", "--sarif-base", "--max-package-kb", "--max-total-kb",
+        ] {
         guard arg == name || arg.has_prefix(name + "=") else { continue }
         handled = true
         let value = match arg.strip_prefix(name + "=") {
@@ -111,6 +121,12 @@ fn parse_cli_arguments(args : Array[String]) -> Result[CliArguments, String] {
                   "Unknown output format '\{value}'. Use json, text, sarif or dot.",
                 )
             }
+          "--sarif-base" => {
+            guard value != "" else {
+              return Err("--sarif-base expects a directory.")
+            }
+            sarif_base = Some(value)
+          }
           "--max-package-kb" =>
             match parse_kib(name, value) {
               Ok(bytes) => options = { ..options, max_package_bytes: bytes, }
@@ -136,7 +152,7 @@ fn parse_cli_arguments(args : Array[String]) -> Result[CliArguments, String] {
     source_root = Some(arg)
   }
   match source_root {
-    Some(root) => Ok(Audit({ root, format, strict, options, }))
+    Some(root) => Ok(Audit({ root, format, strict, sarif_base, options, }))
     None => Err("Missing source directory.")
   }
 }

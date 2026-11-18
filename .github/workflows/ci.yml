@@ -8,8 +8,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Install MoonBit
@@ -25,3 +25,40 @@ jobs:
       - run: node --test test/cli.test.cjs
       - name: Analyze the example mini program
         run: moon run cmd --target js -- --format text --strict examples/shop
+
+  # Runs the composite action from this checkout, the way a mini program
+  # repository would use it (without uploading the deliberately broken
+  # examples to this repository's code scanning).
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Clean example passes
+        uses: ./
+        with:
+          path: examples/shop
+          strict: "true"
+          upload-sarif: "false"
+      - name: Broken example reports findings
+        id: broken
+        uses: ./
+        with:
+          path: examples/shop-broken
+          sarif-file: broken.sarif
+          upload-sarif: "false"
+          fail-on-findings: "false"
+      - name: Check the broken example's SARIF
+        env:
+          EXIT_CODE: ${{ steps.broken.outputs.exit-code }}
+          SARIF_FILE: ${{ steps.broken.outputs.sarif-file }}
+        run: |
+          test "$EXIT_CODE" = 1
+          node -e '
+            const sarif = JSON.parse(require("fs").readFileSync(process.env.SARIF_FILE, "utf8"));
+            const uris = sarif.runs[0].results.map((r) => r.locations[0].physicalLocation.artifactLocation.uri);
+            if (uris.length === 0 || !uris.every((u) => u.startsWith("examples/shop-broken/"))) {
+              console.error(uris);
+              process.exit(1);
+            }
+            console.log(`${uris.length} results, paths relative to the repository root`);
+          '

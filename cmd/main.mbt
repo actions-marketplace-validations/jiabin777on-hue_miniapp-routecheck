@@ -163,6 +163,26 @@ extern "js" fn read_text(root : String, relative : String) -> TextFile =
   #| }
 
 ///|
+/// The URI prefix that turns a path relative to `root` into one relative
+/// to `base`, e.g. "miniprogram/". Errors start with "!".
+extern "js" fn sarif_prefix(base : String, root : String) -> String =
+  #| (base, root) => {
+  #|   const fs = process.getBuiltinModule("node:fs");
+  #|   const path = process.getBuiltinModule("node:path");
+  #|   let resolved;
+  #|   try {
+  #|     resolved = fs.realpathSync(path.resolve(base));
+  #|   } catch (error) {
+  #|     return `!--sarif-base: ${error.message}`;
+  #|   }
+  #|   const relative = path.relative(resolved, root);
+  #|   if (relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+  #|     return `!--sarif-base ${resolved} must contain the mini program root ${root}.`;
+  #|   }
+  #|   return relative === "" ? "" : relative.split(path.sep).join("/") + "/";
+  #| }
+
+///|
 extern "js" fn text_ok(file : TextFile) -> Bool =
   #| (file) => file.ok
 
@@ -209,6 +229,14 @@ fn main {
     return
   }
   let root = project_root(listing)
+  let root_uri = match arguments.sarif_base {
+    Some(base) => sarif_prefix(base, root)
+    None => ""
+  }
+  if root_uri.has_prefix("!") {
+    fail_cli(root_uri[1:].to_owned())
+    return
+  }
   let files = Array::makei(file_count(listing), fn(index) {
     (file_path_at(listing, index), file_size_at(listing, index))
   })
@@ -228,7 +256,7 @@ fn main {
   match arguments.format {
     JsonOutput => println(report.to_json().stringify(indent=2))
     TextOutput => write_stdout(report.to_text(options=arguments.options))
-    SarifOutput => println(report.to_sarif().stringify(indent=2))
+    SarifOutput => println(report.to_sarif(root_uri~).stringify(indent=2))
     DotOutput => write_stdout(report.to_dot())
   }
   let failures = report.count(Error) +

@@ -1,0 +1,118 @@
+name: miniapp-routecheck
+description: Check a WeChat Mini Program's routes, subpackage boundaries and references, and report the findings to GitHub code scanning.
+author: jiabin777on-hue
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  path:
+    description: Directory containing app.json, or a project directory whose project.config.json sets miniprogramRoot. Relative to the workspace.
+    default: "."
+  strict:
+    description: Also fail on warnings.
+    default: "false"
+  max-package-kb:
+    description: Per-package size limit in KiB.
+    default: "2048"
+  max-total-kb:
+    description: Total size limit in KiB.
+    default: "20480"
+  sarif-file:
+    description: Where to write the SARIF report, relative to the workspace.
+    default: routecheck.sarif
+  upload-sarif:
+    description: Upload the SARIF report to code scanning. Needs `security-events write` permission.
+    default: "true"
+  fail-on-findings:
+    description: Fail the step when errors (or warnings with strict) are found. Code scanning still receives the report first.
+    default: "true"
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report.
+    value: ${{ steps.analyze.outputs.sarif-file }}
+  exit-code:
+    description: 0 if clean, 1 if findings fail the check, 2 if the analyzer could not run.
+    value: ${{ steps.analyze.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check Node.js version
+      id: node
+      shell: bash
+      run: |
+        # The CLI needs process.getBuiltinModule (Node.js 22.3+).
+        if command -v node >/dev/null &&
+          node -e 'process.exit(typeof process.getBuiltinModule === "function" ? 0 : 1)'; then
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Set up Node.js
+      if: steps.node.outputs.ready != 'true'
+      uses: actions/setup-node@v5
+      with:
+        node-version: 22
+    - name: Install MoonBit
+      shell: bash
+      run: |
+        if ! command -v moon >/dev/null; then
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+        fi
+    - name: Build routecheck
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        export PATH="$HOME/.moon/bin:$PATH"
+        moon build cmd --target js --release
+    - name: Analyze
+      id: analyze
+      shell: bash
+      env:
+        ROUTECHECK: ${{ github.action_path }}/_build/js/release/build/cmd/cmd.js
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_STRICT: ${{ inputs.strict }}
+        INPUT_MAX_PACKAGE_KB: ${{ inputs.max-package-kb }}
+        INPUT_MAX_TOTAL_KB: ${{ inputs.max-total-kb }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
+      run: |
+        args=(--max-package-kb "$INPUT_MAX_PACKAGE_KB" --max-total-kb "$INPUT_MAX_TOTAL_KB")
+        if [ "$INPUT_STRICT" = "true" ]; then args+=(--strict); fi
+        echo "sarif-file=$INPUT_SARIF_FILE" >> "$GITHUB_OUTPUT"
+
+        # Human-readable report in the log and the job summary.
+        set +e
+        node "$ROUTECHECK" --format text "${args[@]}" -- "$INPUT_PATH" | tee routecheck-summary.txt
+        {
+          echo '### miniapp-routecheck'
+          echo '```'
+          cat routecheck-summary.txt
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        rm -f routecheck-summary.txt
+
+        # SARIF with paths relative to the repository root.
+        node "$ROUTECHECK" --format sarif --sarif-base "$GITHUB_WORKSPACE" "${args[@]}" \
+          -- "$INPUT_PATH" > "$INPUT_SARIF_FILE"
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$code" -eq 2 ]; then
+          echo "::error::routecheck could not analyze $INPUT_PATH"
+          exit 2
+        fi
+    - name: Upload SARIF
+      if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: ${{ steps.analyze.outputs.sarif-file }}
+        category: miniapp-routecheck
+    - name: Fail on findings
+      if: inputs.fail-on-findings == 'true' && steps.analyze.outputs.exit-code != '0'
+      shell: bash
+      run: |
+        echo "::error::routecheck found problems; see the summary or the code scanning alerts."
+        exit 1

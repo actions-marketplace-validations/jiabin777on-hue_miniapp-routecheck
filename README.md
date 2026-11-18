@@ -79,10 +79,26 @@ moon run cmd --target js -- --strict --max-package-kb 1800 <目录>
 | --- | --- |
 | `--format json\|text\|sarif\|dot` | 默认 `json`。`sarif` 可直接上传到 GitHub Code Scanning；`dot` 按包分簇输出依赖图，违规边标红，异步边为虚线。 |
 | `--strict` | warning 也视为失败。 |
+| `--sarif-base <dir>` | SARIF 中的路径改为相对 `<dir>`（通常是仓库根目录），而不是小程序根目录，便于 Code Scanning 定位源码。 |
 | `--max-package-kb <n>` | 单包上限，默认 2048。 |
 | `--max-total-kb <n>` | 总体积上限，默认 20480。 |
 
 退出码：`0` 无 error；`1` 有 error（`--strict` 下含 warning）；`2` 参数或文件系统错误。
+
+### GitHub Actions
+
+仓库自带组合 Action，在小程序仓库中加入下面的步骤即可把诊断上传到 Code Scanning，并在 Pull Request 的改动行上显示。输入、输出和私有仓库的注意事项见 [docs/github-action.md](docs/github-action.md)。
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+steps:
+  - uses: actions/checkout@v5
+  - uses: jiabin777on-hue/miniapp-routecheck@v0.3.0
+    with:
+      path: .
+```
 
 JSON 报告结构：
 
@@ -112,7 +128,7 @@ JSON 报告结构：
 ```sh
 moon test --target js           # 56 个测试：三个解析器、解析器边界情况、每类规则、Tarjan、4 个文档测试
 moon test --target wasm-gc      # 同一套测试在 wasm-gc 上运行（CI 还会跑 native）
-node --test test/cli.test.cjs   # 12 个端到端测试：样例、SARIF、DOT、--strict、体积限额、编码、编译插件、参数
+node --test test/cli.test.cjs   # 13 个端到端测试：样例、SARIF（含 --sarif-base）、DOT、--strict、体积限额、编码、编译插件、参数
 ```
 
 `examples/shop` 是一个包含 3 个 tab 页、普通分包、独立分包、全局组件、WXS、模板和 npm 风格引用的商城小程序，预期零诊断。`examples/shop-broken` 在它的基础上为每类规则注入一个缺陷，端到端测试逐条核对诊断代码与行列号。`examples/good` 与 `examples/broken` 是早期的 app.json 配置样例。
