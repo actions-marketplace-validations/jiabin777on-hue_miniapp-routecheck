@@ -81,14 +81,22 @@ pub fn analyze(
     navigations: [],
     queue: [],
     extended_prefixes: [],
+    plugins: [],
+    plugin_uses: [],
+    workers_root: None,
+    worker_calls: [],
   }
   analyzer.load_manifest(manifest)
+  analyzer.load_features(manifest)
   analyzer.seed(manifest)
+  analyzer.seed_workers()
   analyzer.run()
   analyzer.check_templates()
   analyzer.check_unused_components()
   analyzer.check_boundaries()
   analyzer.check_navigation()
+  analyzer.check_plugins()
+  analyzer.check_workers()
   analyzer.check_require_cycles()
   let packages = analyzer.check_sizes(options)
   // Name the files the developer wrote, not their compiled outputs.

@@ -151,7 +151,8 @@ fn Analyzer::edge_finding(
 /// and components with a placeholder are the sanctioned exceptions.
 fn Analyzer::check_boundaries(self : Analyzer) -> Unit {
   for edge in self.edges {
-    if edge.kind is PageFile {
+    // Worker code has its own rule, check_workers.
+    if edge.kind is PageFile || self.in_workers(edge.from) {
       continue
     }
     let from = self.owner(edge.from)
@@ -449,13 +450,12 @@ fn Analyzer::check_sizes(
     }
   }
   let reachable = self.reach(all_entries)
-  let workers = ["workers"]
   for path, size in self.project.sizes {
     if reachable.contains(path) ||
       is_project_file(path) ||
       path.has_prefix("miniprogram_npm/") ||
       path.contains("/miniprogram_npm/") ||
-      workers.iter().any(fn(w) { is_under(path, w) }) ||
+      self.in_workers(path) ||
       !packaged_extensions.contains(extension(path)) {
       continue
     }

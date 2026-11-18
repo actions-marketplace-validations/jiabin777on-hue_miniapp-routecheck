@@ -121,12 +121,14 @@ JSON 报告结构：
 - **语法**：WXML 标签闭合与错配、JS/WXS/WXSS 词法错误、WXSS 中真机不支持的本地背景图。
 - **模块循环**：Tarjan 强连通分量（迭代实现，深链不会栈溢出）。
 - **体积**：各包体积与限额，不被引用的文件，只被单个分包使用、可以移出主包的文件。
-- **app.json**：页面与分包路径、重复与大小写冲突、`entryPagePath`、tabBar、图标与 `preloadRule`。
+- **插件**：主包与分包 `plugins` 的声明格式，`plugin://` 组件与页面、`requirePlugin` 是否已声明，分包插件是否只在本分包使用，同一插件不能被多个分包声明。
+- **Worker**：`workers` 目录（字符串或 `isSubpackage` 对象形式）、Worker 代码不能引用目录外文件、目录只放 JS、`wx.createWorker` 入口是否存在。
+- **app.json**：页面与分包路径、重复与大小写冲突、`entryPagePath`、tabBar、图标、`preloadRule` 与 `entranceDeclare`。
 
 ## 验证
 
 ```sh
-moon test --target js           # 56 个测试：三个解析器、解析器边界情况、每类规则、Tarjan、4 个文档测试
+moon test --target js           # 62 个测试：三个解析器、解析器边界情况、每类规则（含插件、Worker）、Tarjan、4 个文档测试
 moon test --target wasm-gc      # 同一套测试在 wasm-gc 上运行（CI 还会跑 native）
 node --test test/cli.test.cjs   # 13 个端到端测试：样例、SARIF（含 --sarif-base）、DOT、--strict、体积限额、编码、编译插件、参数
 ```

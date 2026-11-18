@@ -239,7 +239,9 @@ test "template scope follows import, not transitive imports" {
 test "unresolved references and broken components" {
   let report = @routecheck.analyze(
     project([
-      ("app.json", "{\"pages\": [\"pages/a/index\"]}"),
+      (
+        "app.json", "{\"pages\": [\"pages/a/index\"], \"plugins\": {\"myPlugin\": {\"version\": \"1.0.0\", \"provider\": \"wx0000000000000000\"}}}",
+      ),
       ("app.js", "require('./missing')"),
       (
         "pages/a/index.json", "{\"usingComponents\": {\"x\": \"../../comp/x\", \"y\": \"../../comp/y\", \"z\": \"../../comp/none\", \"p\": \"plugin://myPlugin/comp\"}}",

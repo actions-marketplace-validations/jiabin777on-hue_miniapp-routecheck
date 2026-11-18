@@ -49,10 +49,39 @@ pub(all) struct Navigation {
 }
 
 ///|
+/// Mini program APIs whose first argument names a plugin or a file.
+#derive(Eq, Debug)
+pub(all) enum CallApi {
+  /// `requirePlugin('alias')`; the argument is a plugin alias or AppID.
+  RequirePlugin
+  /// `wx.createWorker('workers/x/index.js')`; the argument is the entry
+  /// file, relative to the mini program root.
+  CreateWorker
+}
+
+///|
+pub fn CallApi::name(self : CallApi) -> String {
+  match self {
+    RequirePlugin => "requirePlugin"
+    CreateWorker => "wx.createWorker"
+  }
+}
+
+///|
+/// A call to a `CallApi` whose first argument is a string literal.
+#derive(Eq, Debug)
+pub(all) struct ApiCall {
+  api : CallApi
+  argument : String
+  position : @scan.Position
+}
+
+///|
 #derive(Eq, Debug)
 pub(all) struct ScriptFacts {
   dependencies : Array[Dependency]
   navigations : Array[Navigation]
+  calls : Array[ApiCall]
   errors : Array[@scan.SyntaxError]
 }
 
@@ -240,7 +269,8 @@ fn elided_import(tokens : Array[Token], start : Int32, end : Int32) -> Bool {
 }
 
 ///|
-/// Collects the static module references and page navigations in a
+/// Collects the static module references, page navigations and
+/// `requirePlugin` / `wx.createWorker` calls in a
 /// JavaScript or WXS source file. With `typescript`, the source is a
 /// DevTools-compiled `.ts` file: `import type` and imports whose bindings
 /// are only used as types are dropped, as the compiler drops them.
@@ -248,6 +278,15 @@ pub fn analyze(source : String, typescript~ : Bool = false) -> ScriptFacts {
   let (tokens, errors) = tokenize(source)
   let dependencies : Array[Dependency] = []
   let navigations : Array[Navigation] = []
+  let calls : Array[ApiCall] = []
+  // The literal must be the whole first argument.
+  let first_argument = fn(index : Int32) -> String? {
+    guard static_string(tokens, index) is Some(value) &&
+      (is_punct(tokens, index + 1, ")") || is_punct(tokens, index + 1, ",")) else {
+      return None
+    }
+    Some(value)
+  }
   let add = fn(kind : DependencyKind, index : Int32) {
     guard static_string(tokens, index) is Some(specifier) else { return }
     // In call forms the literal must be the whole first argument.
@@ -313,6 +352,24 @@ pub fn analyze(source : String, typescript~ : Bool = false) -> ScriptFacts {
           add(Import, cursor + 1)
         }
       }
+      "requirePlugin" if is_punct(tokens, index + 1, "(") =>
+        if first_argument(index + 2) is Some(argument) {
+          calls.push({
+            api: RequirePlugin,
+            argument,
+            position: tokens[index + 2].position,
+          })
+        }
+      "wx" if is_punct(tokens, index + 1, ".") &&
+        is_ident(tokens, index + 2, "createWorker") &&
+        is_punct(tokens, index + 3, "(") =>
+        if first_argument(index + 4) is Some(argument) {
+          calls.push({
+            api: CreateWorker,
+            argument,
+            position: tokens[index + 4].position,
+          })
+        }
       "wx" if is_punct(tokens, index + 1, ".") &&
         is_punct(tokens, index + 3, "(") &&
         is_punct(tokens, index + 4, "{") =>
@@ -324,5 +381,5 @@ pub fn analyze(source : String, typescript~ : Bool = false) -> ScriptFacts {
       _ => ()
     }
   }
-  { dependencies, navigations, errors, }
+  { dependencies, navigations, calls, errors, }
 }

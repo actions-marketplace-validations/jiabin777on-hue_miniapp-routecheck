@@ -324,5 +324,8 @@ pub fn audit_manifest(content : String, files : Array[String]) -> Json {
   check_references(manifest, routes, issues)
   check_tab_bar_assets(manifest, paths, issues)
   check_preload_rules(manifest, routes, issues)
+  check_plugin_declarations(manifest, issues)
+  check_workers_declaration(manifest, issues)
+  check_entrance_declare(manifest, routes, issues)
   Json::array(issues)
 }

@@ -2,7 +2,8 @@
 
 A JavaScript lexer for mini program scripts (regex vs. division, nested
 template literals, escapes) and an extractor for the module references and
-`wx.navigateTo`-style page navigations it can determine statically. In
+`wx.navigateTo`-style page navigations it can determine statically, plus
+`requirePlugin` and `wx.createWorker` calls with literal arguments. In
 TypeScript mode, imports used only as types are dropped as `tsc` drops them.
 
 ```mbt check

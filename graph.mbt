@@ -126,6 +126,12 @@ priv struct Analyzer {
   /// Component path prefixes served by `useExtendedLib`, which DevTools
   /// supplies at build time instead of reading from the project.
   extended_prefixes : Array[String]
+  plugins : Array[PluginDeclaration]
+  plugin_uses : Array[PluginUse]
+  /// The `workers` directory, when app.json declares one.
+  mut workers_root : String?
+  /// `wx.createWorker` calls: file, entry path argument, position.
+  worker_calls : Array[(String, String, @scan.Position)]
 }
 
 ///|
@@ -515,6 +521,16 @@ fn Analyzer::read_components(
     if !location.has_prefix("$.componentGenerics") {
       info.declared.push({ tag, location, })
     }
+    if plugin_name_of(reference) is Some(name) {
+      self.plugin_uses.push({
+        name,
+        what: "<\{tag}>",
+        file: json_file,
+        location,
+        position: None,
+        async_component: placeholders.contains(tag),
+      })
+    }
     let resolution = if self.extended_prefixes
       .iter()
       .any(fn(prefix) { reference.has_prefix(prefix) }) {
@@ -668,6 +684,21 @@ fn Analyzer::visit_script(self : Analyzer, path : String, wxs : Bool) -> Unit {
     )
   }
   if !wxs {
+    for call in facts.calls {
+      match call.api {
+        RequirePlugin =>
+          self.plugin_uses.push({
+            name: call.argument,
+            what: "requirePlugin('\{call.argument}')",
+            file: path,
+            location: "",
+            position: Some(call.position),
+            async_component: false,
+          })
+        CreateWorker =>
+          self.worker_calls.push((path, call.argument, call.position))
+      }
+    }
     let page = self.route_of_file(path)
     for navigation in facts.navigations {
       self.navigations.push({

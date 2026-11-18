@@ -144,3 +144,23 @@ test "TypeScript imports used only as types are dropped like tsc drops them" {
   // Plain JavaScript keeps every import.
   assert_eq(specifiers(source).length(), 7)
 }
+
+///|
+test "requirePlugin and wx.createWorker calls with literal arguments" {
+  let source =
+    #|const sdk = requirePlugin('myPlugin')
+    #|const byAppId = requirePlugin("wx2b03c6e691cd7370")
+    #|const worker = wx.createWorker('workers/request/index.js', { useExperimentalWorker: true })
+    #|requirePlugin(name)
+    #|wx.createWorker(`workers/${kind}/index.js`)
+    #|plugin.requirePlugin('member')
+    #|requirePlugin('a' + suffix)
+  let calls = @jsscan.analyze(source).calls.map(fn(c) {
+    (c.api.name(), c.argument, c.position.line)
+  })
+  assert_eq(calls, [
+    ("requirePlugin", "myPlugin", 1),
+    ("requirePlugin", "wx2b03c6e691cd7370", 2),
+    ("wx.createWorker", "workers/request/index.js", 3),
+  ])
+}

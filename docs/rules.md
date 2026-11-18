@@ -1,6 +1,6 @@
 # 规则参考
 
-共 59 个诊断代码。每条诊断都有固定的 `code`、级别和位置。源码文件中的问题给出 `文件:行:列`，配置文件中的问题给出 JSON 路径（如 `$.usingComponents["thumb"]`）。
+共 73 个诊断代码。每条诊断都有固定的 `code`、级别和位置。源码文件中的问题给出 `文件:行:列`，配置文件中的问题给出 JSON 路径（如 `$.usingComponents["thumb"]`）。
 
 级别含义：
 
@@ -91,7 +91,39 @@
 | `package-size-exceeded` | error | 主包或某个分包超过 `--max-package-kb`（默认 2048）。 |
 | `total-size-exceeded` | error | 所有包合计超过 `--max-total-kb`（默认 20480）。 |
 | `move-to-subpackage` | info | 主包中的文件不被主包的任何入口同步引用，只被一个分包使用。移入该分包可直接减小主包体积。 |
-| `unreferenced-file` | info | 可打包的文件（代码、配置、图片）不被任何入口引用。`miniprogram_npm/` 和 `workers/` 下的文件不检查。动态拼接路径引用的图片也会出现在这里，需人工确认。 |
+| `unreferenced-file` | info | 可打包的文件（代码、配置、图片）不被任何入口引用。`miniprogram_npm/` 和 `app.json` 中 `workers` 指定目录下的文件不检查。动态拼接路径引用的图片也会出现在这里，需人工确认。 |
+
+## 插件
+
+依据：[使用插件](https://developers.weixin.qq.com/miniprogram/dev/framework/plugin/using.html)。
+
+插件在 `app.json` 的 `plugins` 或某个分包的 `plugins` 中以“引用名 → `{ version, provider }`”声明。使用处包括：`usingComponents` 中的 `plugin://引用名/组件`、跳转 `url` 为 `plugin://引用名/页面` 的 `wx.navigateTo` 等调用和 `<navigator>`，以及 `requirePlugin('引用名')`。`requirePlugin` 也接受插件的 AppID（基础库 2.14.0 起）。参数不是字符串字面量的 `requirePlugin` 不检查。
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `invalid-plugins` | error | `plugins`（主包或分包）不是对象。 |
+| `invalid-plugin` | error | 插件条目不是对象，或 `version`、`provider` 不是非空字符串。 |
+| `duplicate-plugin` | error | 同一个插件（相同 `provider`）被多个分包声明。文档：“同一个插件不能被多个分包同时引用”。 |
+| `unknown-plugin` | error | 使用的引用名既不在 `app.json` 的 `plugins` 中，也不在任何分包的 `plugins` 中。 |
+| `plugin-not-in-package` | error | 插件只在分包 A 中声明，却在其他包中使用。文档：“默认情况下，仅能在这个分包内使用该插件，除非通过分包异步化进行异步的跨分包引用”，因此声明了 `componentPlaceholder` 的组件不报告。 |
+| `unused-plugin` | info | 声明的插件没有任何静态使用。插件代码包仍会随所在的包下载。跳转地址为动态拼接时也会出现在这里，需人工确认。 |
+
+## Worker
+
+依据：[多线程 Worker](https://developers.weixin.qq.com/miniprogram/dev/framework/workers.html)。
+
+`app.json` 的 `workers` 可以是目录字符串，也可以是 `{ "path": "workers", "isSubpackage": true }`。目录中的每个 `.js` 文件都作为入口分析（它们会被打包进 Worker），因此不会被报告为未引用文件；它们与主包、分包之间的边不套用分包边界规则，改由下表检查。`wx.createWorker('<路径>')` 的路径从小程序根目录写起，开头的 `/` 可省略。
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `invalid-workers` | error | `workers` 不是可移植的相对目录路径（字符串或对象的 `path`），或 `isSubpackage` 不是布尔值。 |
+| `missing-workers-directory` | error | `workers` 指定的目录中没有任何文件。 |
+| `invalid-worker-file` | warning | Worker 目录中有非 JS 文件。文档：“Worker 目录内只支持放置 JS 文件，其他类型的静态文件需要放在 Worker 目录外”。 |
+| `worker-dependency-outside-directory` | error | Worker 代码 `require` / `import` 了 Worker 目录外的文件。文档：“Worker 内代码只能 require 指定 Worker 路径内的文件，无法引用其它路径”。 |
+| `worker-outside-directory` | error | `wx.createWorker` 的入口不在 Worker 目录中，或 `app.json` 没有声明 `workers`。 |
+| `unresolved-worker` | error | `wx.createWorker` 的入口文件不存在（路径需带 `.js`），或越出小程序目录。 |
+
+`isSubpackage: true` 时 Worker 代码会被打包为独立的分包，需要先用 `wx.preDownloadSubpackage` 下载。体积统计目前仍把 Worker 目录计入它所在的包，预下载调用也不检查。
 
 ## app.json 配置
 
@@ -150,6 +182,13 @@ tabBar：
 | `invalid-preload-packages` | error | `packages` 不是数组。 |
 | `invalid-preload-package` | error | `packages` 中的项不是字符串。 |
 | `unknown-preload-package` | error | `packages` 中的名称既不是任何分包的 `name`，也不是 `root`。 |
+
+聊天位置消息入口（`entranceDeclare`，依据 [app.json 配置](https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#entranceDeclare)）：
+
+| code | 级别 | 触发条件 |
+| --- | --- | --- |
+| `invalid-entrance-declare` | error | `entranceDeclare` 或 `locationMessage` 不是对象，`path` 不是字符串，或 `query` 不是字符串。 |
+| `unknown-entrance-route` | error | `locationMessage.path` 不是 `app.json` 中注册的页面（不带开头的 `/` 和查询参数）。 |
 
 ## 已知局限
 
