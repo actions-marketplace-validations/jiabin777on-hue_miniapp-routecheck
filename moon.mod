@@ -10,6 +10,13 @@ repository = "https://github.com/jiabin777on-hue/miniapp-routecheck"
 
 license = "MIT"
 
-keywords = [ "wechat", "miniprogram", "wxml", "wxss", "linter", "static-analysis" ]
+keywords = [
+  "wechat",
+  "miniprogram",
+  "wxml",
+  "wxss",
+  "linter",
+  "static-analysis",
+]
 
 preferred_target = "js"
