@@ -1,4 +1,4 @@
-name = "miniapp/routecheck"
+name = "jiabin777on-hue/routecheck"
 
 version = "0.2.0"
 

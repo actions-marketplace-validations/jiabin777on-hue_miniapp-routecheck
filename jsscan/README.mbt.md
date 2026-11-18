@@ -1,4 +1,4 @@
-# miniapp/routecheck/jsscan
+# jiabin777on-hue/routecheck/jsscan
 
 A JavaScript lexer for mini program scripts (regex vs. division, nested
 template literals, escapes) and an extractor for the module references and

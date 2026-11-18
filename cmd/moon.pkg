@@ -1,5 +1,5 @@
 import {
-  "miniapp/routecheck" @audit,
+  "jiabin777on-hue/routecheck" @audit,
 }
 
 supported_targets = "js"
