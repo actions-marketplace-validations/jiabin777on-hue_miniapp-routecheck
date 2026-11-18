@@ -19,6 +19,9 @@ jobs:
       - run: moon check --target js --deny-warn
       - run: moon fmt --check
       - run: moon test --target js
+      # The analysis core does no I/O, so it is also tested on the other backends.
+      - run: moon test --target wasm-gc
+      - run: moon test --target native
       - run: node --test test/cli.test.cjs
       - name: Analyze the example mini program
         run: moon run cmd --target js -- --format text --strict examples/shop
