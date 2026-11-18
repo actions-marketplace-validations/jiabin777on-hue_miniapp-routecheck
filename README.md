@@ -50,6 +50,13 @@ routecheck  分析核心（纯 MoonBit，无 I/O，全部可用内存样例测�
 
 三个解析器都是为这个工具从零写的，没有依赖第三方解析库。它们都会在出错后继续扫描，一个未闭合的字符串不会让后面的依赖丢失。核心分析不做任何 I/O：文件内容通过 `Project` 中的读取闭包按需提供，因此每条规则都能用内存中的小程序样例做单元测试。
 
+## 在 MoonBit 生态中
+
+- **可复用的解析器包**：`wxml`、`jsscan`、`wxss`、`scan` 是独立的 MoonBit 包，只依赖标准库，别的 MoonBit 项目（如小程序编辑器插件、代码生成器）可以单独引入。每个包都有 `README.mbt.md`，里面的用法示例是 `moon test` 会执行的文档测试：[wxml](wxml/README.mbt.md)、[jsscan](jsscan/README.mbt.md)、[wxss](wxss/README.mbt.md)，分析核心见 [analyze.mbt.md](analyze.mbt.md)。
+- **多后端**：分析核心不做 I/O，CI 在 JS、wasm-gc、native 三个后端上运行全部单元测试。CLI 通过 `extern "js"` 调用 Node.js 文件系统，目前只编译到 JS；核心可以直接编译成 Wasm，嵌入网页或编辑器扩展。
+- **用到的语言特性**：`enum` 与模式匹配表达引用解析结果（`Found / External / Missing / Escapes`）和诊断级别；读取闭包让规则测试全部在内存中完成；`#|` 多行字符串直接内嵌小程序样例；`moon fmt`、`moon check --deny-warn`、`moon info` 与 `.mbt.md` 文档测试都在 CI 中把关。
+- **发布准备**：`moon.mod` 已填写 `readme`、`repository`、`license`、`keywords`，`moon package` 校验通过，可以发布到 [mooncakes.io](https://mooncakes.io)。
+
 ## 运行
 
 需要 [MoonBit 工具链](https://www.moonbitlang.com/download/)和 Node.js 22.3 或更新版本。传入包含 `app.json` 的小程序目录，或包含 `project.config.json` 的项目目录（按 `miniprogramRoot` 查找源码）。
@@ -97,7 +104,8 @@ JSON 报告结构：
 ## 验证
 
 ```sh
-moon test --target js           # 52 个单元测试：三个解析器、解析器边界情况、每类规则、Tarjan
+moon test --target js           # 56 个测试：三个解析器、解析器边界情况、每类规则、Tarjan、4 个文档测试
+moon test --target wasm-gc      # 同一套测试在 wasm-gc 上运行（CI 还会跑 native）
 node --test test/cli.test.cjs   # 12 个端到端测试：样例、SARIF、DOT、--strict、体积限额、编码、编译插件、参数
 ```
 
