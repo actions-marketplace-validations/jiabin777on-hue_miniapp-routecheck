@@ -1,5 +1,7 @@
 # 在 GitHub Actions 中使用
 
+Marketplace 页面：[miniapp-routecheck](https://github.com/marketplace/actions/miniapp-routecheck)。
+
 仓库根目录的 `action.yml` 是一个组合 Action：安装 MoonBit、把 routecheck 编译为 JavaScript、分析小程序、把结果写入任务摘要并以 SARIF 上传到 GitHub Code Scanning。诊断会出现在 Pull Request 的改动行上，以及仓库的 Security → Code scanning 页面中。
 
 ## 示例工作流

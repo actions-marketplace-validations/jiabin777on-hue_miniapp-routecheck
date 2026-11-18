@@ -1,5 +1,10 @@
 # 微信小程序路由体检（miniapp-routecheck）
 
+[![CI](https://github.com/jiabin777on-hue/miniapp-routecheck/actions/workflows/ci.yml/badge.svg)](https://github.com/jiabin777on-hue/miniapp-routecheck/actions/workflows/ci.yml)
+[![mooncakes](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmooncakes.io%2Fapi%2Fv0%2Fmodules%2Fjiabin777on-hue%2Froutecheck&query=%24.version&label=mooncakes&color=blue)](https://mooncakes.io/docs/jiabin777on-hue/routecheck)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-miniapp--routecheck-blue?logo=github)](https://github.com/marketplace/actions/miniapp-routecheck)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 用 MoonBit 编写的微信小程序**依赖图与分包边界分析器**。它读取构建后的小程序目录，用自带的 WXML、JS、WXSS 解析器提取每个文件的引用，建立"页面 → 组件 → 脚本 / 模板 / 样式 / 图片"的完整依赖图。在此基础上，它检查分包边界、页面跳转、模板作用域、模块循环和包体积，并给出把主包文件挪进分包的瘦身建议。
 
 这些问题平时要到真机运行、上传代码或用户点击时才暴露。例如主包 `require` 了分包里的工具函数、`navigateTo` 打开了 tabBar 页面、独立分包悄悄依赖了主包的请求封装。本工具在提交前、在 CI 里一次性指出问题，每条诊断都带 `文件:行:列`。
@@ -101,7 +106,7 @@ JSON 报告结构：
 
 ### GitHub Actions
 
-仓库自带组合 Action，在小程序仓库中加入下面的步骤即可把诊断上传到 Code Scanning，并在 Pull Request 的改动行上显示。输入、输出和私有仓库的注意事项见 [docs/github-action.md](docs/github-action.md)。
+仓库自带组合 Action，已上架 [GitHub Marketplace](https://github.com/marketplace/actions/miniapp-routecheck)。在小程序仓库中加入下面的步骤即可把诊断上传到 Code Scanning，并在 Pull Request 的改动行上显示。输入、输出和私有仓库的注意事项见 [docs/github-action.md](docs/github-action.md)。
 
 ```yaml
 permissions:
