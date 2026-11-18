@@ -55,7 +55,13 @@ routecheck  分析核心（纯 MoonBit，无 I/O，全部可用内存样例测�
 - **可复用的解析器包**：`wxml`、`jsscan`、`wxss`、`scan` 是独立的 MoonBit 包，只依赖标准库，别的 MoonBit 项目（如小程序编辑器插件、代码生成器）可以单独引入。每个包都有 `README.mbt.md`，里面的用法示例是 `moon test` 会执行的文档测试：[wxml](wxml/README.mbt.md)、[jsscan](jsscan/README.mbt.md)、[wxss](wxss/README.mbt.md)，分析核心见 [analyze.mbt.md](analyze.mbt.md)。
 - **多后端**：分析核心不做 I/O，CI 在 JS、wasm-gc、native 三个后端上运行全部单元测试。CLI 通过 `extern "js"` 调用 Node.js 文件系统，目前只编译到 JS；核心可以直接编译成 Wasm，嵌入网页或编辑器扩展。
 - **用到的语言特性**：`enum` 与模式匹配表达引用解析结果（`Found / External / Missing / Escapes`）和诊断级别；读取闭包让规则测试全部在内存中完成；`#|` 多行字符串直接内嵌小程序样例；`moon fmt`、`moon check --deny-warn`、`moon info` 与 `.mbt.md` 文档测试都在 CI 中把关。
-- **发布准备**：`moon.mod` 已填写 `readme`、`repository`、`license`、`keywords`，`moon package` 校验通过，可以发布到 [mooncakes.io](https://mooncakes.io)。
+- **已发布到 mooncakes**：模块名 [`jiabin777on-hue/routecheck`](https://mooncakes.io/docs/jiabin777on-hue/routecheck)。在其他 MoonBit 项目中引入：
+
+  ```sh
+  moon add jiabin777on-hue/routecheck
+  ```
+
+  然后在 `moon.pkg` 的 `import` 中加入需要的包，例如 `"jiabin777on-hue/routecheck/wxml"`。
 
 ## 运行
 
