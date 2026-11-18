@@ -106,7 +106,7 @@ JSON 报告结构：
 
 ### GitHub Actions
 
-仓库自带组合 Action，已上架 [GitHub Marketplace](https://github.com/marketplace/actions/miniapp-routecheck)。在小程序仓库中加入下面的步骤即可把诊断上传到 Code Scanning，并在 Pull Request 的改动行上显示。输入、输出和私有仓库的注意事项见 [docs/github-action.md](docs/github-action.md)。
+仓库自带组合 Action，已上架 [GitHub Marketplace](https://github.com/marketplace/actions/miniapp-routecheck)。在小程序仓库中加入下面的步骤即可把诊断上传到 Code Scanning，并在 Pull Request 的改动行上显示。输入、输出和私有仓库的注意事项见 [docs/github-action.md](docs/github-action.md)。实际效果见演示仓库 [routecheck-demo](https://github.com/jiabin777on-hue/routecheck-demo) 的 [Pull Request #1](https://github.com/jiabin777on-hue/routecheck-demo/pull/1)：5 条诊断标注在改动行上，检查失败。
 
 ```yaml
 permissions:
