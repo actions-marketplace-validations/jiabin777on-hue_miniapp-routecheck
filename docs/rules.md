@@ -90,8 +90,17 @@
 | --- | --- | --- |
 | `package-size-exceeded` | error | 主包或某个分包超过 `--max-package-kb`（默认 2048）。 |
 | `total-size-exceeded` | error | 所有包合计超过 `--max-total-kb`（默认 20480）。 |
-| `move-to-subpackage` | info | 主包中的文件不被主包的任何入口同步引用，只被一个分包使用。移入该分包可直接减小主包体积。 |
+| `move-to-subpackage` | info | 主包中的文件不被主包的任何入口同步引用，只被一个分包使用。移入该分包可直接减小主包体积，具体步骤见下方迁移清单。 |
 | `unreferenced-file` | info | 可打包的文件（代码、配置、图片）不被任何入口引用。`miniprogram_npm/` 和 `app.json` 中 `workers` 指定目录下的文件不检查。动态拼接路径引用的图片也会出现在这里，需人工确认。 |
+
+### 迁移清单
+
+报告的 `moves`（JSON）和文本报告末尾给出执行 `move-to-subpackage` 建议的具体步骤：
+
+- 文件移到 `<分包 root>/<原路径>`，例如 `utils/chart.js` → `packageGoods/utils/chart.js`。目标位置已有文件时 `conflict` 为 `true`。
+- 页面或组件的 `.json`、`.js`、`.wxml`、`.wxss` 只能一起移动；其中任何一个仍被主包使用时，整个组件都不列入清单（建议本身仍会报告）。`miniprogram_npm` 中的文件不列入，应改为在分包中构建 npm。
+- `rewrites` 包括其他文件对被移动文件的引用，以及被移动文件自身中因位置变化而失效的相对引用；同时移动、相对位置不变的引用不列出。新写法保留原来的风格：`/` 开头的仍写根路径，相对路径重新计算为最短的 `./` 或 `../` 形式，省略的 `.js`、`/index` 等后缀继续省略。
+- 无法确定新写法的引用 `replacement` 为空，需要人工处理。动态拼接的路径不在依赖图中，也不会列出。
 
 ## 插件
 

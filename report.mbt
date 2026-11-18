@@ -3,6 +3,8 @@
 pub struct Report {
   findings : Array[Finding]
   packages : Array[PackageStats]
+  /// How to carry out the `move-to-subpackage` suggestions.
+  moves : Array[Move]
   edges : Array[Edge]
   files : Int32
 }
@@ -38,7 +40,13 @@ pub fn analyze(
   options~ : Options = Options::default(),
 ) -> Report {
   let empty = fn(findings) {
-    { findings, packages: [], edges: [], files: project.sizes.length(), }
+    {
+      findings,
+      packages: [],
+      moves: [],
+      edges: [],
+      files: project.sizes.length(),
+    }
   }
   guard project.exists("app.json") else {
     return empty([
@@ -85,6 +93,7 @@ pub fn analyze(
     plugin_uses: [],
     workers_root: None,
     worker_calls: [],
+    move_candidates: [],
   }
   analyzer.load_manifest(manifest)
   analyzer.load_features(manifest)
@@ -99,11 +108,15 @@ pub fn analyze(
   analyzer.check_workers()
   analyzer.check_require_cycles()
   let packages = analyzer.check_sizes(options)
+  let candidates = analyzer.move_candidates.copy()
+  candidates.sort_by(fn(a, b) { compare_paths(a.0, b.0) })
+  let moves = analyzer.plan_moves(candidates)
   // Name the files the developer wrote, not their compiled outputs.
   let source = fn(path) { project.source_name(path) }
   {
     findings: analyzer.findings.map(fn(f) { { ..f, file: source(f.file), } }),
     packages,
+    moves,
     edges: analyzer.edges.map(fn(e) {
       { ..e, from: source(e.from), to: source(e.to), file: source(e.file), }
     }),
@@ -137,6 +150,7 @@ pub fn Report::to_json(self : Report) -> Json {
     },
     "packages": Json::array(self.packages.map(fn(p) { p.to_json() })),
     "findings": Json::array(self.findings.map(fn(f) { f.to_json() })),
+    "moves": Json::array(self.moves.map(fn(m) { m.to_json() })),
   }
 }
 
@@ -192,6 +206,23 @@ pub fn Report::to_text(
       out.write_string(
         "  \{pad(name, width)}  \{pad(kib(p.bytes), 11)} of \{kib(options.max_package_bytes)}  \{p.files} files\{suffix}\n",
       )
+    }
+  }
+  if !self.moves.is_empty() {
+    out.write_string("\nMoving files out of the main package:\n")
+    for m in self.moves {
+      let conflict = if m.conflict { "  (target exists)" } else { "" }
+      out.write_string("  \{m.file} -> \{m.to}  \{kib(m.bytes)}\{conflict}\n")
+      for r in m.rewrites {
+        let replacement = if r.replacement == "" {
+          "update by hand"
+        } else {
+          "'\{r.replacement}'"
+        }
+        out.write_string(
+          "    \{r.where_()}  '\{r.specifier}' -> \{replacement}\n",
+        )
+      }
     }
   }
   out.write_string(

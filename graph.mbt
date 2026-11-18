@@ -54,6 +54,9 @@ pub(all) struct Edge {
   location : String
   line : Int32
   column : Int32
+  /// The reference as written (`../../utils/chart`); empty for edges that
+  /// app.json implies, such as page files.
+  specifier : String
 }
 
 ///|
@@ -132,6 +135,8 @@ priv struct Analyzer {
   mut workers_root : String?
   /// `wx.createWorker` calls: file, entry path argument, position.
   worker_calls : Array[(String, String, @scan.Position)]
+  /// `move-to-subpackage` files and the subpackage that uses each.
+  move_candidates : Array[(String, Int32)]
 }
 
 ///|
@@ -168,12 +173,13 @@ fn Analyzer::edge(
   file : String,
   location~ : String = "",
   position? : @scan.Position,
+  specifier~ : String = "",
 ) -> Unit {
   let (line, column) = match position {
     Some(p) => (p.line, p.column)
     None => (0, 0)
   }
-  self.edges.push({ from, to, kind, file, location, line, column, })
+  self.edges.push({ from, to, kind, file, location, line, column, specifier, })
 }
 
 ///|
@@ -350,7 +356,14 @@ fn Analyzer::seed(self : Analyzer, manifest : Map[String, Json]) -> Unit {
       }
       match resolve_reference(self.project, "", reference, asset_lookup) {
         Found(path) => {
-          self.edge("app", path, Asset, "app.json", location="$.\{field}")
+          self.edge(
+            "app",
+            path,
+            Asset,
+            "app.json",
+            location="$.\{field}",
+            specifier=reference,
+          )
           self.enqueue_file(path)
         }
         External => ()
@@ -545,7 +558,14 @@ fn Analyzer::read_components(
         } else {
           Component
         }
-        self.edge(base, target, edge_kind, json_file, location~)
+        self.edge(
+          base,
+          target,
+          edge_kind,
+          json_file,
+          location~,
+          specifier=reference,
+        )
         self.enqueue_unit(target, Component)
       }
       External => ()
@@ -589,7 +609,7 @@ fn Analyzer::reference(
 ) -> String? {
   match resolve_reference(self.project, dirname(file), reference, lookup) {
     Found(target) => {
-      self.edge(file, target, kind, file, position~)
+      self.edge(file, target, kind, file, position~, specifier=reference)
       self.enqueue_file(target)
       Some(target)
     }

@@ -85,6 +85,20 @@ moon run cmd --target js -- --strict --max-package-kb 1800 <目录>
 
 退出码：`0` 无 error；`1` 有 error（`--strict` 下含 warning）；`2` 参数或文件系统错误。
 
+JSON 报告结构：
+
+```json
+{
+  "summary": { "errors": 8, "warnings": 3, "infos": 2, "files": 51, "edges": 28 },
+  "packages": [{ "name": "goods", "root": "packageGoods", "independent": false, "files": 10, "bytes": 841, "movableBytes": 94 }],
+  "findings": [{ "code": "main-package-references-subpackage", "severity": "error", "file": "pages/cart/index.js", "line": 1, "column": 26, "detail": "..." }],
+  "moves": [{ "file": "utils/chart.js", "to": "packageGoods/utils/chart.js", "package": "goods", "bytes": 94, "conflict": false,
+              "rewrites": [{ "file": "packageGoods/detail/index.js", "line": 3, "column": 27, "specifier": "../../utils/chart", "replacement": "../utils/chart" }] }]
+}
+```
+
+`moves` 是 `move-to-subpackage` 建议的迁移清单：每个文件移到分包根目录下的同名路径，`rewrites` 列出移动后必须修改的每一处引用（`文件:行:列`，配置文件中为 JSON 路径）及修改前后的写法，`text` 格式在末尾以 “Moving files out of the main package” 列出同样内容。规则见 [docs/rules.md](docs/rules.md#迁移清单)。
+
 ### GitHub Actions
 
 仓库自带组合 Action，在小程序仓库中加入下面的步骤即可把诊断上传到 Code Scanning，并在 Pull Request 的改动行上显示。输入、输出和私有仓库的注意事项见 [docs/github-action.md](docs/github-action.md)。
@@ -100,16 +114,6 @@ steps:
       path: .
 ```
 
-JSON 报告结构：
-
-```json
-{
-  "summary": { "errors": 8, "warnings": 3, "infos": 2, "files": 51, "edges": 28 },
-  "packages": [{ "name": "goods", "root": "packageGoods", "independent": false, "files": 10, "bytes": 841, "movableBytes": 94 }],
-  "findings": [{ "code": "main-package-references-subpackage", "severity": "error", "file": "pages/cart/index.js", "line": 1, "column": 26, "detail": "..." }]
-}
-```
-
 ## 检查范围
 
 完整规则、级别和依据见 [docs/rules.md](docs/rules.md)。概要：
@@ -120,7 +124,7 @@ JSON 报告结构：
 - **组件与模板**：`"component": true`、组件文件完整性、声明却未使用的组件、`<template is>` 的作用域（import 不传递、include 继承包含方）。
 - **语法**：WXML 标签闭合与错配、JS/WXS/WXSS 词法错误、WXSS 中真机不支持的本地背景图。
 - **模块循环**：Tarjan 强连通分量（迭代实现，深链不会栈溢出）。
-- **体积**：各包体积与限额，不被引用的文件，只被单个分包使用、可以移出主包的文件。
+- **体积**：各包体积与限额，不被引用的文件，只被单个分包使用、可以移出主包的文件，以及移动这些文件时需要修改的每一处引用（迁移清单）。
 - **插件**：主包与分包 `plugins` 的声明格式，`plugin://` 组件与页面、`requirePlugin` 是否已声明，分包插件是否只在本分包使用，同一插件不能被多个分包声明。
 - **Worker**：`workers` 目录（字符串或 `isSubpackage` 对象形式）、Worker 代码不能引用目录外文件、目录只放 JS、`wx.createWorker` 入口是否存在。
 - **app.json**：页面与分包路径、重复与大小写冲突、`entryPagePath`、tabBar、图标、`preloadRule` 与 `entranceDeclare`。
@@ -128,7 +132,7 @@ JSON 报告结构：
 ## 验证
 
 ```sh
-moon test --target js           # 62 个测试：三个解析器、解析器边界情况、每类规则（含插件、Worker）、Tarjan、4 个文档测试
+moon test --target js           # 64 个测试：三个解析器、解析器边界情况、每类规则（含插件、Worker）、迁移清单、Tarjan、4 个文档测试
 moon test --target wasm-gc      # 同一套测试在 wasm-gc 上运行（CI 还会跑 native）
 node --test test/cli.test.cjs   # 13 个端到端测试：样例、SARIF（含 --sarif-base）、DOT、--strict、体积限额、编码、编译插件、参数
 ```

@@ -88,3 +88,17 @@ fn max_int(a : Int32, b : Int32) -> Int32 {
     b
   }
 }
+
+///|
+/// Orders paths character by character, so that files in one directory
+/// stay together (`String::compare` puts shorter strings first).
+fn compare_paths(a : String, b : String) -> Int32 {
+  let left = a.to_array()
+  let right = b.to_array()
+  for index in 0..<min_int(left.length(), right.length()) {
+    if left[index] != right[index] {
+      return left[index].compare(right[index])
+    }
+  }
+  left.length().compare(right.length())
+}

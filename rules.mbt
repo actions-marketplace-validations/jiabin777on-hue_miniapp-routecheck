@@ -497,6 +497,7 @@ fn Analyzer::check_sizes(
     guard list is [only] else { continue }
     let size = self.project.size(file)
     movable[only] += size
+    self.move_candidates.push((file, only))
     self.add(
       config_finding(
         "move-to-subpackage",

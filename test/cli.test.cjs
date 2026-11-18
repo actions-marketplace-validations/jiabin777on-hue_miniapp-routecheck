@@ -92,6 +92,25 @@ test('every injected defect in the broken shop is found at its source position',
   ]);
   const summary = JSON.parse(audit.stdout).summary;
   assert.deepEqual([summary.errors, summary.warnings, summary.infos], [8, 3, 2]);
+  // The move-to-subpackage suggestion comes with the references to update.
+  assert.deepEqual(JSON.parse(audit.stdout).moves, [
+    {
+      file: 'utils/chart.js',
+      to: 'packageGoods/utils/chart.js',
+      package: 'goods',
+      bytes: 94,
+      conflict: false,
+      rewrites: [
+        {
+          file: 'packageGoods/detail/index.js',
+          line: 3,
+          column: 27,
+          specifier: '../../utils/chart',
+          replacement: '../utils/chart',
+        },
+      ],
+    },
+  ]);
 });
 
 test('SARIF output is valid 2.1.0 with one result per finding', () => {
@@ -239,6 +258,10 @@ test('the text format reports the same findings with a human-readable location',
   assert.equal(audit.status, 1, audit.stderr);
   assert.match(audit.stdout, /^error   pages\/me\/index\.wxml:1:1  \[wxml-syntax-error\]/m);
   assert.match(audit.stdout, /goods +0\.\d KiB +of 2048\.0 KiB +10 files +\(0\.1 KiB movable from main\)/);
+  assert.match(
+    audit.stdout,
+    /utils\/chart\.js -> packageGoods\/utils\/chart\.js  0\.1 KiB\n    packageGoods\/detail\/index\.js:3:27  '\.\.\/\.\.\/utils\/chart' -> '\.\.\/utils\/chart'\n/,
+  );
   assert.match(audit.stdout, /8 errors, 3 warnings, 2 notes\./);
 });
 
