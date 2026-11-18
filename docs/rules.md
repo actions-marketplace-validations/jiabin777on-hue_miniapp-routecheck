@@ -24,7 +24,7 @@
 
 依据：[wx.navigateTo](https://developers.weixin.qq.com/miniprogram/dev/api/route/wx.navigateTo.html)、[wx.switchTab](https://developers.weixin.qq.com/miniprogram/dev/api/route/wx.switchTab.html)、[navigator](https://developers.weixin.qq.com/miniprogram/dev/component/navigator.html)。
 
-检查对象：JS 中 `wx.navigateTo / redirectTo / reLaunch / switchTab({ url })`，以及 WXML 中 `<navigator url open-type>`。`url` 为字符串字面量，或 `?` 之前不含 `${}` 的模板字符串时才检查；查询参数会被去掉。相对路径按所在页面的路由解析；非页面文件（如 `utils/`）中的相对路径因为无法确定当前页面而跳过。
+检查对象：JS 中 `wx.navigateTo / redirectTo / reLaunch / switchTab({ url })`，以及 WXML 中 `<navigator url open-type>`。`url` 为字符串字面量，或 `?` 之前不含 `${}` 的模板字符串时才检查；查询参数会被去掉。相对路径按所在页面的路由解析；非页面文件（如 `utils/`）中的相对路径因为无法确定当前页面而跳过。空 `url`、以 `#` 开头、`javascript:` 和网络地址（含 `//host`）不是页面路径，WeUI 等组件库把它们用作占位链接，不检查。`open-type` 也接受驼峰写法 `openType`。
 
 | code | 级别 | 触发条件 |
 | --- | --- | --- |
@@ -36,6 +36,10 @@
 ## 模块与引用解析
 
 解析规则：`/a/b` 相对小程序根目录；`./`、`../` 相对当前文件目录；裸路径先在当前目录及各级父目录的 `miniprogram_npm` 中查找，再按相对当前目录处理。JS 会补全 `.js` 和 `/index.js`；组件以 `.json` 定位，可补全 `/index.json`。网络地址、`plugin://`、`cloud://`、`data:` 和包含 `{{ }}` 的值视为外部引用，不检查。
+
+`app.json` 的 `useExtendedLib.weui` 开启时，`weui-miniprogram/...` 组件由开发者工具在构建时提供，视为外部引用。
+
+**编译插件**：`project.config.json` 的 `setting.useCompilerPlugins` 包含 `typescript`、`less` 或 `sass` 时，按开发者工具的编译结果分析：`a.ts` 视为 `a.js`，`a.less`、`a.scss`、`a.sass` 视为 `a.wxss`（同名的编译产物已存在时以产物为准，`.d.ts` 不参与）。诊断仍指向源文件。TypeScript 中的 `import type`、`import { type T }`，以及绑定名只出现在类型位置（`:`、`<`、`|`、`&`、`as`、`implements` 之后）的 import 会像 `tsc` 一样被删除，不检查目标；Less / Sass 中的 `//` 注释会被跳过。配置读取自小程序根目录或项目目录下的 `project.config.json`。
 
 | code | 级别 | 触发条件 |
 | --- | --- | --- |
@@ -150,5 +154,7 @@ tabBar：
 ## 已知局限
 
 - JS 分析基于词法，不做数据流：`const url = '/pages/a'; wx.navigateTo({ url })` 不检查。
-- 只分析构建后的小程序目录。TypeScript、Taro、uni-app 等项目请传入编译输出目录。
+- 只分析小程序目录本身。原生 TypeScript / Less / Sass 项目按 `useCompilerPlugins` 直接分析源码；Taro、uni-app 等框架项目请传入编译输出目录。
+- TypeScript 的类型导入判断基于词法：作为对象属性值使用的绑定（`{ key: Name }`）会被误认为类型位置，对应 import 不会被检查。
+- npm 依赖按开发者工具"构建 npm"后的 `miniprogram_npm` 查找。直接分析未构建的源码仓库时，npm 包会报 `unresolved-module` / `unresolved-component`。
 - 体积是源文件字节的近似值，用于在开发阶段提前发现问题，最终以开发者工具的上传结果为准。

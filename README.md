@@ -97,14 +97,39 @@ JSON 报告结构：
 ## 验证
 
 ```sh
-moon test --target js           # 48 个单元测试：三个解析器、解析器边界情况、每类规则、Tarjan
-node --test test/cli.test.cjs   # 11 个端到端测试：样例、SARIF、DOT、--strict、体积限额、编码、参数
+moon test --target js           # 52 个单元测试：三个解析器、解析器边界情况、每类规则、Tarjan
+node --test test/cli.test.cjs   # 12 个端到端测试：样例、SARIF、DOT、--strict、体积限额、编码、编译插件、参数
 ```
 
 `examples/shop` 是一个包含 3 个 tab 页、普通分包、独立分包、全局组件、WXS、模板和 npm 风格引用的商城小程序，预期零诊断。`examples/shop-broken` 在它的基础上为每类规则注入一个缺陷，端到端测试逐条核对诊断代码与行列号。`examples/good` 与 `examples/broken` 是早期的 app.json 配置样例。
 
+## 真实项目验证
+
+在两个腾讯官方开源小程序上运行（2026-11-18 的默认分支）：
+
+| 项目 | 文件 | 诊断 | 说明 |
+| --- | --- | --- | --- |
+| [Tencent/weui-wxss](https://github.com/Tencent/weui-wxss) `dist/` | 307 | 0 error，0 warning | 全部 126 条 info 为未被引用的样式文件（WeUI 按需引入的组件样式）。 |
+| [wechat-miniprogram/miniprogram-demo](https://github.com/wechat-miniprogram/miniprogram-demo) | 3283 | 50 error，30 warning | 官方示例，TypeScript + Less，11 个分包，含独立分包、Skyline 与 `useExtendedLib`。 |
+
+miniprogram-demo 中经人工核对的真实问题，例如：
+
+- `packageAPI/pages/device/bluetooth/slave/slave.wxml` 用 `../../../../common/head.wxml` 引用模板，少了一级 `../`，`head`、`foot` 两个模板因此都不可用。
+- `packageCloud` 中 `wx.navigateTo` 到 `/page/cloud/pages/crud-detail/crud-detail`，`app.json` 中没有注册这个路由（云开发页面现在位于 `packageCloud/` 分包）。
+- `packageExtend/pages/form/form/form.wxml` 等页面的 `../images/*.jpg` 指向不存在的目录（图片实际在 `packageExtend/pages/images/`）。
+- `<image mode="center" ... mode='aspectFit'>`、`<slider value=... value=...>` 这类重复属性。
+- 分包 `packageAPI` 的源文件体积为 2179 KiB，超过 2 MB 分包上限（以开发者工具上传结果为准）。
+- 其余 26 条 error 来自尚未"构建 npm"的依赖（如 `threejs-miniprogram`），在开发者工具中构建后即消失。
+
+验证过程中发现并修复的误报：`useExtendedLib` 扩展库组件、WeUI 的 `url=""` / `javascript:` 占位链接、`openType` 驼峰写法，以及 TypeScript / Less 项目（现按 `useCompilerPlugins` 分析源码，并像 `tsc` 一样忽略纯类型导入）。复现：
+
+```sh
+git clone --depth 1 --recurse-submodules https://github.com/wechat-miniprogram/miniprogram-demo
+moon run cmd --target js -- --format text miniprogram-demo
+```
+
 ## 已知局限
 
-JS 分析基于词法而非数据流，变量传入的 `url` 不检查。工具只分析编译后的小程序目录，体积为源文件字节的近似值。详见 [docs/rules.md](docs/rules.md#已知局限)。
+JS 分析基于词法而非数据流，变量传入的 `url` 不检查。Taro、uni-app 等框架项目请传入编译输出目录；npm 依赖需先在开发者工具中构建。体积为源文件字节的近似值。详见 [docs/rules.md](docs/rules.md#已知局限)。
 
 规则依据[微信小程序全局配置](https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html)、[使用分包](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/basic.html)、[独立分包](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/independent.html)与[分包异步化](https://developers.weixin.qq.com/miniprogram/dev/framework/subpackages/async.html)。项目使用 AI 辅助设计、实现与测试，所有规则和测试由参赛者审核。
