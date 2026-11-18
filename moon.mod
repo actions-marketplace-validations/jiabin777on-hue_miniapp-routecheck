@@ -1,6 +1,6 @@
 name = "jiabin777on-hue/routecheck"
 
-version = "0.2.0"
+version = "0.3.0"
 
 description = "Dependency graph and subpackage boundary analyzer for WeChat Mini Programs, with WXML, JavaScript and WXSS parsers written in MoonBit"
 
